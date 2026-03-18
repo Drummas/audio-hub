@@ -24,7 +24,10 @@ WAVEFORMS_DIR = "/app/waveforms"
 SPEAKERS_DIR = "/app/speakers"
 CONFIG_PATH = "/app/config.json"
 METADATA_PATH = "/app/metadata.json"
-FASTER_WHISPER_URL = "http://192.168.2.132:10300/inference"
+FASTER_WHISPER_URL = os.getenv(
+    "FASTER_WHISPER_URL",
+    "http://faster-whisper:10300/inference"
+)
 
 os.makedirs(FILES_DIR, exist_ok=True)
 os.makedirs(BATCHES_DIR, exist_ok=True)
@@ -32,9 +35,9 @@ os.makedirs(WAVEFORMS_DIR, exist_ok=True)
 os.makedirs(SPEAKERS_DIR, exist_ok=True)
 
 DEFAULT_CONFIG = {
-    "whisper_model": "large-v3",
-    "xtts_language": "en",
-    "xtts_voice": "default",
+    "whisper_model": os.getenv("WHISPER_MODEL", "large-v3"),
+    "xtts_language": os.getenv("XTTS_LANGUAGE", "en"),
+    "xtts_voice": os.getenv("XTTS_VOICE", "default"),
 }
 
 # -----------------------------
@@ -520,12 +523,14 @@ async def ui_settings_post(
     whisper_model: str = Form(...),
     xtts_language: str = Form(...),
     xtts_voice: str = Form(...),
-):
-    cfg = {
-        "whisper_model": whisper_model,
-        "xtts_language": xtts_language,
-        "xtts_voice": xtts_voice,
-    }
+):   
+    cfg = load_config()
+
+    # Override with environment variables if present
+    cfg["whisper_model"] = os.getenv("WHISPER_MODEL", cfg["whisper_model"])
+    cfg["xtts_language"] = os.getenv("XTTS_LANGUAGE", cfg["xtts_language"])
+    cfg["xtts_voice"] = os.getenv("XTTS_VOICE", cfg["xtts_voice"])       
+    
     save_config(cfg)
     return templates.TemplateResponse(
         "settings.html", {"request": request, "cfg": cfg}
@@ -536,3 +541,10 @@ async def ui_error(request: Request, message: str = "Error"):
     return templates.TemplateResponse(
         "error.html", {"request": request, "message": message}
     )
+
+print("=== Audio Hub Configuration ===")
+print(f"FASTER_WHISPER_URL = {FASTER_WHISPER_URL}")
+print(f"Whisper Model      = {DEFAULT_CONFIG['whisper_model']}")
+print(f"XTTS Language      = {DEFAULT_CONFIG['xtts_language']}")
+print(f"XTTS Voice         = {DEFAULT_CONFIG['xtts_voice']}")
+print("================================")

@@ -23,13 +23,18 @@ services:
     depends_on:
       - faster-whisper
     environment:
-      - COQUI_TOS_AGREED=1
+      FASTER_WHISPER_URL: "http://192.168.2.132:10300/inference"
+      XTTS_LANGUAGE: "en"
+      XTTS_VOICE: "default"
+      WHISPER_MODEL: "large-v3"
+      COQUI_TOS_AGREED: "1"
     volumes:
       - ./files:/app/files
       - ./batches:/app/batches
       - ./waveforms:/app/waveforms
       - ./speakers:/app/speakers
       - ./config:/app/config
+      - ./tts-cache:/root/.local/share/tts
     ports:
       - "8000:8000"
     restart: unless-stopped
