@@ -14,15 +14,12 @@ RUN apt-get update && apt-get install -y \
 ENV MPLCONFIGDIR=/tmp/matplotlib
 RUN mkdir -p /tmp/matplotlib
 
+# Accept Coqui XTTS license non-interactively
+ENV COQUI_TOS_AGREED=1
+
 # Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Pre-cache XTTS v2 model (optional but recommended)
-RUN python3 - <<EOF
-from TTS.api import TTS
-TTS("tts_models/multilingual/multi-dataset/xtts_v2")
-EOF
 
 # Create required directories
 RUN mkdir -p /app/files /app/batches /app/waveforms /app/speakers
