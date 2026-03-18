@@ -27,6 +27,7 @@ services:
       XTTS_LANGUAGE: "en"
       XTTS_VOICE: "default"
       WHISPER_MODEL: "large-v3"
+      DEFAULT_TRANSLATION_LANGUAGE: "pt"
       COQUI_TOS_AGREED: "1"
     volumes:
       - ./files:/app/files

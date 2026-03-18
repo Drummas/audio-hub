@@ -38,6 +38,7 @@ DEFAULT_CONFIG = {
     "whisper_model": os.getenv("WHISPER_MODEL", "large-v3"),
     "xtts_language": os.getenv("XTTS_LANGUAGE", "en"),
     "xtts_voice": os.getenv("XTTS_VOICE", "default"),
+    "default_translation_language": DEFAULT_TRANSLATION_LANGUAGE,
 }
 
 # -----------------------------
@@ -158,8 +159,8 @@ async def transcribe_audio(
 async def translate_audio(
     file: UploadFile = File(...),
     model: str = Form("whisper-1"),
-    response_format: str = Form("json"),
-    target_language: str = Form("en"),
+    response_format: str = Form("srt"),
+    target_language: str = Form(DEFAULT_TRANSLATION_LANGUAGE),
 ):
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         shutil.copyfileobj(file.file, tmp)
@@ -313,7 +314,7 @@ async def ui_transcribe(
     file: UploadFile = File(...),
     mode: str = Form("transcribe"),
     language: str = Form("auto"),
-    target_language: str = Form("en"),
+    target_language: str = Form(DEFAULT_TRANSLATION_LANGUAGE),
     response_format: str = Form("json"),
 ):
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
