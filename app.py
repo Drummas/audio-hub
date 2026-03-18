@@ -24,7 +24,7 @@ WAVEFORMS_DIR = "/app/waveforms"
 SPEAKERS_DIR = "/app/speakers"
 CONFIG_PATH = "/app/config.json"
 METADATA_PATH = "/app/metadata.json"
-FASTER_WHISPER_URL = "http://faster-whisper:10300/inference"
+FASTER_WHISPER_URL = "http://192.168.2.132:10300/inference"
 
 os.makedirs(FILES_DIR, exist_ok=True)
 os.makedirs(BATCHES_DIR, exist_ok=True)
