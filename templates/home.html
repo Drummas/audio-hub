@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const dropZone = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file-input");
+  if (dropZone && fileInput) {
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = "#80cbc4";
+    });
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.style.borderColor = "#444";
+    });
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = "#444";
+      const files = e.dataTransfer.files;
+      if (files.length > 0) fileInput.files = files;
+    });
+    dropZone.addEventListener("click", () => fileInput.click());
+  }
+});
+</script>
+{% endblock %}
+
+{% block body %}
+<h1>Local Whisper + XTTS v2</h1>
+
+<p>
+  <a href="/ui/settings">Settings</a> |
+  <a href="/ui/files">Files</a>
+</p>
+
+<h2>Transcribe / Translate</h2>
+<form action="/ui/transcribe" method="post" enctype="multipart/form-data">
+  <fieldset>
+    <div id="drop-zone" style="border:2px dashed #444;padding:1rem;border-radius:8px;margin-bottom:1rem;cursor:pointer;">
+      Drop audio file here or click to select.
+    </div>
+    <input type="file" name="file" id="file-input" required style="display:none;">
+
+    <label>Mode:
+      <select name="mode">
+        <option value="transcribe">Transcribe</option>
+        <option value="translate">Translate</option>
+      </select>
+    </label>
+    <label>Language (transcribe):
+      <input name="language" value="auto">
+    </label>
+    <label>Target language (translate):
+      <input name="target_language" value="en">
+    </label>
+    <label>Format:
+      <select name="response_format">
+        <option value="json">JSON</option>
+        <option value="srt">SRT</option>
+      </select>
+    </label>
+  </fieldset>
+  <button type="submit">Run</button>
+</form>
+
+<h2>Batch Job</h2>
+<form action="/ui/batch" method="post" enctype="multipart/form-data">
+  <fieldset>
+    <label>Audio files:
+      <input type="file" name="files" multiple required>
+    </label>
+    <label>Task:
+      <select name="task">
+        <option value="transcribe">Transcribe</option>
+        <option value="translate">Translate</option>
+      </select>
+    </label>
+    <label>Language:
+      <input name="language" value="auto">
+    </label>
+  </fieldset>
+  <button type="submit">Create Batch</button>
+</form>
+
+<h2>Text‑to‑Speech (XTTS v2)</h2>
+<form action="/ui/tts" method="post">
+  <fieldset>
+    <label>Text:</label>
+    <textarea name="text" rows="4" required></textarea>
+    <label>Language:
+      <input name="language" value="{{ cfg.xtts_language }}">
+    </label>
+    <label>Voice:
+      <input name="voice" value="{{ cfg.xtts_voice }}">
+    </label>
+  </fieldset>
+  <button type="submit">Generate Speech</button>
+</form>
+{% endblock %}

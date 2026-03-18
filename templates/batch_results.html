@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block body %}
+<h1>Batch Results</h1>
+<p>ID: <code>{{ batch_id }}</code></p>
+
+{% for item in results %}
+<details style="margin-bottom:1rem;">
+  <summary style="cursor:pointer;">File: {{ item.file_id }}</summary>
+
+  {% if item.result.text %}
+    <pre>{{ item.result.text }}</pre>
+  {% endif %}
+
+  {% if item.result.segments %}
+    <ul>
+      {% for s in item.result.segments %}
+        <li><strong>{{ "%.2f"|format(s.start) }}–{{ "%.2f"|format(s.end) }}</strong> {{ s.text }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</details>
+{% endfor %}
+
+<p><a href="/">Back</a></p>
+{% endblock %}

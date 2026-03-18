@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+    <title>{{ title or "Local Audio Hub" }}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <script src="/static/js/theme.js" defer></script>
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <h2>Audio Hub</h2>
+        <nav>
+          <a href="/">Home</a>
+          <a href="/ui/files">Files</a>
+          <a href="/ui/settings">Settings</a>
+        </nav>
+        <div class="theme-toggle">
+          <button type="button" onclick="toggleTheme()">Toggle theme</button>
+        </div>
+      </aside>
+      <main class="main">
+        {% block body %}{% endblock %}
+      </main>
+    </div>
+  </body>
+</html>

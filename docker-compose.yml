@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  faster-whisper:
+    image: lscr.io/linuxserver/faster-whisper:latest
+    container_name: faster-whisper
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - WHISPER_BEAM=1
+      - WHISPER_LANG=auto
+      - WHISPER_MODEL=auto
+    volumes:
+      - ./faster-whisper-data:/config
+    ports:
+      - "10300:10300"
+    restart: unless-stopped
+
+  audio-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: audio-hub
+    depends_on:
+      - faster-whisper
+    volumes:
+      - ./files:/app/files
+      - ./batches:/app/batches
+      - ./waveforms:/app/waveforms
+      - ./speakers:/app/speakers
+      - ./config:/app
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

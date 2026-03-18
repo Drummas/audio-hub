@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block body %}
+<h1>Uploaded Files</h1>
+<table>
+  <tr>
+    <th>ID</th>
+    <th>Name</th>
+    <th>Bytes</th>
+    <th>Duration</th>
+    <th>Language</th>
+    <th>Actions</th>
+  </tr>
+
+  {% for f in files %}
+  <tr>
+    <td><code>{{ f.id }}</code></td>
+    <td>{{ f.filename }}</td>
+    <td>{{ f.bytes }}</td>
+    <td>{{ "%.2f"|format(f.duration) }}s</td>
+    <td>{{ f.language or "-" }}</td>
+    <td>
+      <a href="/v1/files/{{ f.id }}">Download</a> |
+      <a href="/ui/waveform?file_id={{ f.id }}">Waveform</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<p><a href="/">Back</a></p>
+{% endblock %}

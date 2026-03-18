@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block body %}
+<h1>Subtitle Preview</h1>
+<table>
+  <tr><th>Start</th><th>End</th><th>Text</th></tr>
+  {% for s in segments %}
+  <tr>
+    <td>{{ "%.2f"|format(s.start) }}</td>
+    <td>{{ "%.2f"|format(s.end) }}</td>
+    <td>{{ s.text }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p><a href="/">Back</a></p>
+{% endblock %}

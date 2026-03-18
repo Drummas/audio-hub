@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block body %}
+<h1>Settings</h1>
+<form action="/ui/settings" method="post">
+  <fieldset>
+    <label>Whisper Model:
+      <select name="whisper_model">
+        {% for m in ["tiny","base","small","medium","large-v3"] %}
+          <option value="{{ m }}" {% if cfg.whisper_model == m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>XTTS Language:
+      <input name="xtts_language" value="{{ cfg.xtts_language }}">
+    </label>
+
+    <label>XTTS Voice:
+      <input name="xtts_voice" value="{{ cfg.xtts_voice }}">
+    </label>
+  </fieldset>
+
+  <button type="submit">Save</button>
+</form>
+
+<p><a href="/">Back</a></p>
+{% endblock %}
