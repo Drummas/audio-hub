@@ -7,10 +7,10 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Etc/UTC
+      - TZ=Europe/London
       - WHISPER_BEAM=1
       - WHISPER_LANG=auto
-      - WHISPER_MODEL=auto
+      - WHISPER_MODEL=large-v3-turbo
     volumes:
       - ./faster-whisper-data:/config
     ports:
@@ -18,18 +18,18 @@ services:
     restart: unless-stopped
 
   audio-hub:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/drummas/audio-hub:release
     container_name: audio-hub
     depends_on:
       - faster-whisper
+    environment:
+      - COQUI_TOS_AGREED=1
     volumes:
       - ./files:/app/files
       - ./batches:/app/batches
       - ./waveforms:/app/waveforms
       - ./speakers:/app/speakers
-      - ./config:/app
+      - ./config:/app/config
     ports:
       - "8000:8000"
     restart: unless-stopped

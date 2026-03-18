@@ -6,3 +6,4 @@ TTS
 jinja2
 pydub
 matplotlib
+transformers==4.37.2
