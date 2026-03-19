@@ -10,7 +10,7 @@ services:
       - TZ=Europe/London
       - WHISPER_BEAM=1
       - WHISPER_LANG=auto
-      - WHISPER_MODEL=large-v3
+      - WHISPER_MODEL=medium
     volumes:
       - ./faster-whisper-data:/config
     ports:
@@ -23,12 +23,14 @@ services:
     depends_on:
       - faster-whisper
     environment:
-      FASTER_WHISPER_URL: "http://192.168.2.132:10300/inference"
-      XTTS_LANGUAGE: "en"
-      XTTS_VOICE: "default"
-      WHISPER_MODEL: "large-v3"
-      DEFAULT_TRANSLATION_LANGUAGE: "pt"
-      COQUI_TOS_AGREED: "1"
+      - FASTER_WHISPER_URL: "http://192.168.2.132:10300/inference"
+      - XTTS_LANGUAGE: "en"
+      - XTTS_VOICE: "default"
+      - WHISPER_BEAM=1
+      - WHISPER_LANG=auto
+      - WHISPER_MODEL=medium
+      - DEFAULT_TRANSLATION_LANGUAGE: "pt"
+      COQUI_TOS_AGREED: "1"     
     volumes:
       - ./files:/app/files
       - ./batches:/app/batches
@@ -38,4 +40,5 @@ services:
       - ./tts-cache:/root/.local/share/tts
     ports:
       - "8000:8000"
+    command: ["python3", "-c", "import requests; requests.get('http://192.168.2.132:10300')"]
     restart: unless-stopped

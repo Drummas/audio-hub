@@ -142,7 +142,7 @@ async def transcribe_audio(
         shutil.copyfileobj(file.file, tmp)
         path = tmp.name
 
-    async with httpx.AsyncClient(timeout=600) as client:
+    async with httpx.AsyncClient(timeout=1800) as client:
         resp = await client.post(
             FASTER_WHISPER_URL,
             files={"audio_file": open(path, "rb")},
@@ -166,7 +166,7 @@ async def translate_audio(
         shutil.copyfileobj(file.file, tmp)
         path = tmp.name
 
-    async with httpx.AsyncClient(timeout=600) as client:
+    async with httpx.AsyncClient(timeout=1800) as client:
         resp = await client.post(
             FASTER_WHISPER_URL,
             files={"audio_file": open(path, "rb")},
@@ -321,7 +321,7 @@ async def ui_transcribe(
         shutil.copyfileobj(file.file, tmp)
         path = tmp.name
 
-    async with httpx.AsyncClient(timeout=600) as client:
+    async with httpx.AsyncClient(timeout=1800) as client:
         if mode == "translate":
             resp = await client.post(
                 FASTER_WHISPER_URL,
