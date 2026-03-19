@@ -121,14 +121,14 @@
       </div>
 
       <!-- Desktop menu -->
-      <div class="ah-links">
-        <a href="/"><svg class="ah-icon"><use href="#icon-home"/></svg>Home</a>
-        <a href="/ui/settings"><svg class="ah-icon"><use href="#icon-settings"/></svg>Settings</a>
-        <a href="/ui/files"><svg class="ah-icon"><use href="#icon-folder"/></svg>Files</a>
-        <a href="/ui/dashboard"><svg class="ah-icon"><use href="#icon-dashboard"/></svg>Dashboard</a>
-        <a href="/ui/logs"><svg class="ah-icon"><use href="#icon-logs"/></svg>Logs</a>
-      </div>
-    </div>
+	  <div class="ah-links">
+	    <a href="/"><svg class="ah-icon"><use href="#icon-home"/></svg>Home</a>
+	    <a href="/ui/settings"><svg class="ah-icon"><use href="#icon-settings"/></svg>Settings</a>
+	    <a href="/ui/files"><svg class="ah-icon"><use href="#icon-folder"/></svg>Files</a>
+	    <a href="/ui/dashboard"><svg class="ah-icon"><use href="#icon-dashboard"/></svg>Dashboard</a>
+	    <a href="/ui/system"><svg class="ah-icon"><use href="#icon-system"/></svg>System</a>
+	    <a href="/ui/logs"><svg class="ah-icon"><use href="#icon-logs"/></svg>Logs</a>
+	  </div>
 
     <div class="ah-right">
       <button id="theme-toggle" style="
@@ -138,7 +138,8 @@
         padding:4px 8px;
         border-radius:6px;
         cursor:pointer;
-      ">Theme</button>
+		onclick="toggleTheme()"
+      ">Toggle Theme</button>
 
       <span id="job-badge" style="
         background:#111;
