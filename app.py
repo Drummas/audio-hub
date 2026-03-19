@@ -2,6 +2,9 @@ import os
 import uuid
 import json
 import shutil
+import psutil
+import platform
+import datetime
 import threading
 import tempfile
 import logging
@@ -262,6 +265,62 @@ async def notify_jobcount():
         WS_JOBCOUNT.discard(ws)
 
 # -----------------------------
+# Disk + model stats
+# -----------------------------
+def get_disk_usage(path):
+    try:
+        usage = shutil.disk_usage(path)
+        return {
+            "path": path,
+            "total": usage.total,
+            "used": usage.used,
+            "free": usage.free,
+            "percent": round(usage.used / usage.total * 100, 2)
+        }
+    except Exception as e:
+        return {"path": path, "error": str(e)}
+
+def get_dir_size(path):
+    total = 0
+    for root, dirs, files in os.walk(path):
+        for f in files:
+            try:
+                fp = os.path.join(root, f)
+                total += os.path.getsize(fp)
+            except:
+                pass
+    return total
+
+def get_cache_health(path):
+    if not os.path.exists(path):
+        return {"exists": False, "status": "missing"}
+
+    size = get_dir_size(path)
+    files = sum(len(files) for _, _, files in os.walk(path))
+
+    if size < 10_000_000:  # <10MB means incomplete XTTS download
+        status = "incomplete"
+    else:
+        status = "healthy"
+
+    return {
+        "exists": True,
+        "status": status,
+        "files": files,
+        "size": size
+    }
+
+def get_system_info():
+    return {
+        "platform": platform.platform(),
+        "python": platform.python_version(),
+        "cpu_count": psutil.cpu_count(),
+        "load_avg": psutil.getloadavg(),
+        "memory": dict(psutil.virtual_memory()._asdict()),
+        "uptime": datetime.datetime.now() - datetime.datetime.fromtimestamp(psutil.boot_time())
+    }
+
+# -----------------------------
 # Progress broadcast
 # -----------------------------
 async def notify_progress(batch_id: str):
@@ -375,7 +434,89 @@ async def sse_jobcount():
                 yield f"data: {json.dumps(state)}\n\n"
             await asyncio.sleep(1)
     return StreamingResponse(event_stream(), media_type="text/event-stream")
-    
+
+# -----------------------------
+# System endpoint
+# -----------------------------
+@app.get("/ui/system", response_class=HTMLResponse)
+async def ui_system(request: Request):
+    tts_cache = "/root/.local/share/tts"
+    hf_cache = "/root/.cache/huggingface"
+    files_dir = "/app/files"
+    batches_dir = "/app/batches"
+
+    data = {
+        "system": get_system_info(),
+        "disk": [
+            get_disk_usage("/"),
+            get_disk_usage("/app"),
+            get_disk_usage(tts_cache),
+            get_disk_usage(hf_cache),
+        ],
+        "models": {
+            "xtts_cache": get_cache_health(tts_cache),
+            "hf_cache": get_cache_health(hf_cache),
+        },
+        "directories": {
+            "files": get_dir_size(files_dir),
+            "batches": get_dir_size(batches_dir),
+        }
+    }
+
+    return templates.TemplateResponse("system.html", {
+        "request": request,
+        "data": data
+    })
+
+# -----------------------------
+# Clear cache + rebuild models endpoint
+# -----------------------------
+@app.post("/api/clear_xtts_cache")
+async def clear_xtts_cache():
+    path = "/root/.local/share/tts"
+    try:
+        if os.path.exists(path):
+            shutil.rmtree(path)
+        os.makedirs(path, exist_ok=True)
+        return {"status": "ok", "message": "XTTS cache cleared"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/clear_hf_cache")
+async def clear_hf_cache():
+    path = "/root/.cache/huggingface"
+    try:
+        if os.path.exists(path):
+            shutil.rmtree(path)
+        os.makedirs(path, exist_ok=True)
+        return {"status": "ok", "message": "HuggingFace cache cleared"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/rebuild_models")
+async def rebuild_models():
+    try:
+        # Clear XTTS + HF caches
+        xtts = "/root/.local/share/tts"
+        hf = "/root/.cache/huggingface"
+
+        if os.path.exists(xtts):
+            shutil.rmtree(xtts)
+        if os.path.exists(hf):
+            shutil.rmtree(hf)
+
+        os.makedirs(xtts, exist_ok=True)
+        os.makedirs(hf, exist_ok=True)
+
+        # Force reload on next request
+        logger.info("Model rebuild requested — caches cleared")
+
+        return {"status": "ok", "message": "Model caches cleared. XTTS will rebuild on next use."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 # -----------------------------
 # OpenAI-compatible endpoints
 # -----------------------------

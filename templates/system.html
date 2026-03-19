@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block body %}
+<h1>System Status</h1>
+
+<div style="display:flex; gap:15px; margin-bottom:20px;">
+  <button id="clear-xtts" style="padding:6px 12px;">Clear XTTS Cache</button>
+  <button id="clear-hf" style="padding:6px 12px;">Clear HF Cache</button>
+  <button id="rebuild-models" style="padding:6px 12px;">Rebuild Models</button>
+</div>
+
+<div id="sys-message" style="margin-bottom:20px; color:#0f0;"></div>
+
+<style>
+.sys-card {
+  background:#111;
+  border:1px solid #333;
+  padding:15px;
+  border-radius:8px;
+  margin-bottom:20px;
+}
+.sys-card h2 {
+  margin-top:0;
+}
+pre {
+  background:#000;
+  padding:10px;
+  border-radius:6px;
+  overflow:auto;
+}
+</style>
+
+<div class="sys-card">
+  <h2>System Info</h2>
+  <pre>{{ data.system | tojson(indent=2) }}</pre>
+</div>
+
+<div class="sys-card">
+  <h2>Disk Usage</h2>
+  <pre>{{ data.disk | tojson(indent=2) }}</pre>
+</div>
+
+<div class="sys-card">
+  <h2>Model Cache Health</h2>
+  <pre>{{ data.models | tojson(indent=2) }}</pre>
+</div>
+
+<div class="sys-card">
+  <h2>Directory Sizes</h2>
+  <pre>{{ data.directories | tojson(indent=2) }}</pre>
+</div>
+
+<script>
+	async function callAPI(url) {
+	  const msg = document.getElementById("sys-message");
+	  msg.textContent = "Working…";
+
+	  const resp = await fetch(url, { method: "POST" });
+	  const data = await resp.json();
+
+	  msg.style.color = data.status === "ok" ? "#0f0" : "#f33";
+	  msg.textContent = data.message;
+	}
+
+	document.getElementById("clear-xtts").onclick = () =>
+	  callAPI("/api/clear_xtts_cache");
+
+	document.getElementById("clear-hf").onclick = () =>
+	  callAPI("/api/clear_hf_cache");
+
+	document.getElementById("rebuild-models").onclick = () =>
+	  callAPI("/api/rebuild_models");
+</script>
+
+
+{% endblock %}

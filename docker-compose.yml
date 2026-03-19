@@ -12,7 +12,7 @@ services:
       WHISPER_LANG: "auto"
       WHISPER_MODEL: "medium"
     volumes:
-      - ./faster-whisper-data:/config
+      - /DATA/AppData/faster-whisper/config:/config
     ports:
       - "10300:10300"
     networks:
@@ -34,12 +34,12 @@ services:
       DEFAULT_TRANSLATION_LANGUAGE: "pt"
       COQUI_TOS_AGREED: "1"
     volumes:
-      - ./files:/app/files
-      - ./batches:/app/batches
-      - ./waveforms:/app/waveforms
-      - ./speakers:/app/speakers
-      - ./config:/app/config
-      - ./tts-cache:/root/.local/share/tts
+      - /DATA/AppData/audio-hub/files:/app/files
+      - /DATA/AppData/audio-hub/batches:/app/batches
+      - /DATA/AppData/audio-hub/waveforms:/app/waveforms
+      - /DATA/AppData/audio-hub/speakers:/app/speakers
+      - /DATA/AppData/audio-hub/config:/app/config
+      - /DATA/AppData/audio-hub/tts-cache:/root/.local/share/tts
     ports:
       - "8000:8000"
     networks:
