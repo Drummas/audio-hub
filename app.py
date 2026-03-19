@@ -28,6 +28,10 @@ FASTER_WHISPER_URL = os.getenv(
     "FASTER_WHISPER_URL",
     "http://faster-whisper:10300/inference"
 )
+DEFAULT_TRANSLATION_LANGUAGE = os.getenv(
+    "DEFAULT_TRANSLATION_LANGUAGE",
+    "pt"
+)
 
 os.makedirs(FILES_DIR, exist_ok=True)
 os.makedirs(BATCHES_DIR, exist_ok=True)
