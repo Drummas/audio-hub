@@ -49,31 +49,25 @@
       <aside class="sidebar">
         <h2>Audio Hub</h2>
 		<style>
-		/* --- NAV LAYOUT --- */
+		/* NAV CONTAINER */
 		nav {
 		  display: flex;
 		  align-items: center;
+		  justify-content: space-between;
 		  padding: 10px 0;
 		  border-bottom: 1px solid #333;
 		  position: relative;
+		  z-index: 10;
 		}
 
-		/* Left side: menu + hamburger */
+		/* LEFT SIDE (hamburger + desktop menu) */
 		.nav-left {
 		  display: flex;
 		  align-items: center;
 		  gap: 20px;
 		}
 
-		/* Right side: badge + theme toggle */
-		.nav-right {
-		  margin-left: auto;
-		  display: flex;
-		  align-items: center;
-		  gap: 15px;
-		}
-
-		/* --- MENU LINKS --- */
+		/* DESKTOP MENU */
 		.nav-links {
 		  display: flex;
 		  gap: 20px;
@@ -92,14 +86,22 @@
 		  color: #fff;
 		}
 
-		/* --- ICONS --- */
+		/* RIGHT SIDE (theme toggle + badge) */
+		.nav-right {
+		  display: flex;
+		  align-items: center;
+		  gap: 15px;
+		  white-space: nowrap;
+		}
+
+		/* ICONS */
 		.nav-icon {
 		  width: 16px;
 		  height: 16px;
 		  fill: currentColor;
 		}
 
-		/* --- MOBILE COLLAPSE --- */
+		/* HAMBURGER */
 		.hamburger {
 		  display: none;
 		  cursor: pointer;
@@ -113,23 +115,31 @@
 		  background: #ccc;
 		}
 
-		/* Mobile menu hidden by default */
+		/* MOBILE MENU */
 		#mobile-menu {
 		  display: none;
 		  flex-direction: column;
 		  gap: 15px;
 		  padding: 10px 0;
+		  background: #111;
+		  border-bottom: 1px solid #333;
 		}
 
-		@media (max-width: 700px) {
+		#mobile-menu a {
+		  color: #ccc;
+		  text-decoration: none;
+		  display: flex;
+		  align-items: center;
+		  gap: 6px;
+		}
+
+		/* RESPONSIVE RULES */
+		@media (max-width: 750px) {
 		  .nav-links {
 			display: none;
 		  }
 		  .hamburger {
 			display: flex;
-		  }
-		  #mobile-menu {
-			display: none;
 		  }
 		  #mobile-menu.open {
 			display: flex;
@@ -139,12 +149,12 @@
 
 		<nav>
 		  <div class="nav-left">
-			<!-- Hamburger -->
+			<!-- Hamburger (mobile only) -->
 			<div class="hamburger" id="hamburger">
 			  <div></div><div></div><div></div>
 			</div>
 
-			<!-- Desktop links -->
+			<!-- Desktop menu -->
 			<div class="nav-links">
 			  <a href="/"><svg class="nav-icon"><use href="#icon-home"/></svg>Home</a>
 			  <a href="/ui/settings"><svg class="nav-icon"><use href="#icon-settings"/></svg>Settings</a>
@@ -155,7 +165,6 @@
 		  </div>
 
 		  <div class="nav-right">
-			<!-- Theme toggle -->
 			<button id="theme-toggle" style="
 			  background:#111;
 			  color:#ccc;
@@ -165,7 +174,6 @@
 			  cursor:pointer;
 			">Theme</button>
 
-			<!-- Job badge -->
 			<span id="job-badge" style="
 			  background:#111;
 			  color:#0f0;
@@ -176,8 +184,7 @@
 			">Jobs: 0</span>
 		  </div>
 		</nav>
-
-		<!-- Mobile menu -->
+		<!-- Mobile dropdown -->
 		<div id="mobile-menu">
 		  <a href="/"><svg class="nav-icon"><use href="#icon-home"/></svg>Home</a>
 		  <a href="/ui/settings"><svg class="nav-icon"><use href="#icon-settings"/></svg>Settings</a>
@@ -185,6 +192,7 @@
 		  <a href="/ui/dashboard"><svg class="nav-icon"><use href="#icon-dashboard"/></svg>Dashboard</a>
 		  <a href="/ui/logs"><svg class="nav-icon"><use href="#icon-logs"/></svg>Logs</a>
 		</div>
+
         <div class="theme-toggle">
           <button type="button" onclick="toggleTheme()">Toggle theme</button>
         </div>
@@ -215,8 +223,7 @@
 		<path d="M4 4h16v2H4zm0 6h16v2H4zm0 6h10v2H4z"/>
 	  </symbol>
   </svg>
-  <script>
-	// Mobile menu toggle
+<script>
 	const hamburger = document.getElementById("hamburger");
 	const mobileMenu = document.getElementById("mobile-menu");
 
@@ -224,10 +231,8 @@
 	  mobileMenu.classList.toggle("open");
 	});
 
-	// Theme toggle
-	const themeBtn = document.getElementById("theme-toggle");
-	themeBtn.addEventListener("click", () => {
+	document.getElementById("theme-toggle").addEventListener("click", () => {
 	  document.body.classList.toggle("light-theme");
 	});
-  </script>  
+</script>
 </html>
