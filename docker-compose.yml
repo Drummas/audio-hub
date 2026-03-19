@@ -10,7 +10,7 @@ services:
       - TZ=Europe/London
       - WHISPER_BEAM=1
       - WHISPER_LANG=auto
-      - WHISPER_MODEL=large-v3-turbo
+      - WHISPER_MODEL=large-v3
     volumes:
       - ./faster-whisper-data:/config
     ports:

@@ -28,10 +28,6 @@ FASTER_WHISPER_URL = os.getenv(
     "FASTER_WHISPER_URL",
     "http://faster-whisper:10300/inference"
 )
-DEFAULT_TRANSLATION_LANGUAGE = os.getenv(
-    "DEFAULT_TRANSLATION_LANGUAGE",
-    "pt"
-)
 
 os.makedirs(FILES_DIR, exist_ok=True)
 os.makedirs(BATCHES_DIR, exist_ok=True)
@@ -164,7 +160,7 @@ async def translate_audio(
     file: UploadFile = File(...),
     model: str = Form("whisper-1"),
     response_format: str = Form("srt"),
-    target_language: str = Form(DEFAULT_TRANSLATION_LANGUAGE),
+    target_language: str = Form(os.getenv("DEFAULT_TRANSLATION_LANGUAGE", "pt")),
 ):
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         shutil.copyfileobj(file.file, tmp)
@@ -318,7 +314,7 @@ async def ui_transcribe(
     file: UploadFile = File(...),
     mode: str = Form("transcribe"),
     language: str = Form("auto"),
-    target_language: str = Form(DEFAULT_TRANSLATION_LANGUAGE),
+    target_language: str = Form(os.getenv("DEFAULT_TRANSLATION_LANGUAGE", "pt")),
     response_format: str = Form("json"),
 ):
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
