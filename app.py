@@ -658,7 +658,7 @@ async def ui_transcribe_async(
     file: UploadFile = File(...),
     mode: str = Form("transcribe"),
     language: str = Form("auto"),
-    target_language: str = Form(DEFAULT_TRANSLATION_LANGUAGE),
+    target_language: str = Form(os.getenv("DEFAULT_TRANSLATION_LANGUAGE", "pt")),
     response_format: str = Form("json"),
 ):
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
