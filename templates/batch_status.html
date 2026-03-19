@@ -2,7 +2,94 @@
 
 {% block body %}
 <h1>Batch Status</h1>
-<p>ID: <code>{{ batch_id }}</code></p>
-<pre>{{ data|tojson(indent=2) }}</pre>
+<p>ID: <code id="batch-id">{{ batch_id }}</code></p>
+
+<div id="progress-container" style="margin: 20px 0;">
+    <label>Progress:</label>
+    <progress id="progress-bar" value="0" max="100" style="width: 100%; height: 25px;"></progress>
+    <p id="progress-text">Waiting for updates…</p>
+</div>
+
+<pre id="json-output">{{ data|tojson(indent=2) }}</pre>
+
 <p><a href="/">Back</a></p>
+
+<script>
+const batchId = document.getElementById("batch-id").textContent;
+const progressBar = document.getElementById("progress-bar");
+const progressText = document.getElementById("progress-text");
+const jsonOutput = document.getElementById("json-output");
+
+// ------------------------------
+// Update UI with new progress
+// ------------------------------
+function updateProgress(data) {
+    jsonOutput.textContent = JSON.stringify(data, null, 2);
+
+    if (!data || !data.total) {
+        progressText.textContent = "Waiting for progress…";
+        return;
+    }
+
+    const pct = Math.floor((data.completed / data.total) * 100);
+    progressBar.value = pct;
+    progressText.textContent = `${pct}% — ${data.completed} of ${data.total} files processed`;
+
+    if (data.status === "completed") {
+        progressText.textContent = "Batch completed!";
+    }
+}
+
+// ------------------------------
+// Try WebSocket first
+// ------------------------------
+function connectWebSocket() {
+    const wsUrl = `ws://${window.location.host}/ws/progress/${batchId}`;
+    console.log("Connecting WebSocket:", wsUrl);
+
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => console.log("WebSocket connected");
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        updateProgress(data);
+    };
+    ws.onerror = (err) => {
+        console.warn("WebSocket error:", err);
+        ws.close();
+    };
+    ws.onclose = () => {
+        console.warn("WebSocket closed — falling back to SSE");
+        connectSSE();
+    };
+}
+
+// ------------------------------
+// SSE fallback
+// ------------------------------
+function connectSSE() {
+    const sseUrl = `/v1/progress/${batchId}`;
+    console.log("Connecting SSE:", sseUrl);
+
+    const evtSource = new EventSource(sseUrl);
+
+    evtSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        updateProgress(data);
+
+        if (data.status === "completed") {
+            evtSource.close();
+        }
+    };
+
+    evtSource.onerror = (err) => {
+        console.error("SSE error:", err);
+        evtSource.close();
+    };
+}
+
+// Start WebSocket → fallback to SSE
+connectWebSocket();
+</script>
+
 {% endblock %}

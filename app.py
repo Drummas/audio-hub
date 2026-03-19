@@ -4,11 +4,16 @@ import json
 import shutil
 import threading
 import tempfile
+import logging
+import sys
+import time
+import asyncio
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from logging.handlers import RotatingFileHandler
 
 import httpx
 from TTS.api import TTS
@@ -24,6 +29,15 @@ WAVEFORMS_DIR = "/app/waveforms"
 SPEAKERS_DIR = "/app/speakers"
 CONFIG_PATH = "/app/config.json"
 METADATA_PATH = "/app/metadata.json"
+LOG_FILE = "/app/logs/app.log"
+PROGRESS = {}      # batch_id -> dict
+WS_CONNECTIONS = {}  # batch_id -> set of websockets
+# Progress tracking
+PROGRESS_BATCH: dict[str, dict] = {}
+PROGRESS_SINGLE: dict[str, dict] = {}
+WS_BATCH: dict[str, set[WebSocket]] = {}
+WS_SINGLE: dict[str, set[WebSocket]] = {}
+WS_JOBCOUNT = set()
 FASTER_WHISPER_URL = os.getenv(
     "FASTER_WHISPER_URL",
     "http://faster-whisper:10300/inference"
@@ -33,6 +47,7 @@ os.makedirs(FILES_DIR, exist_ok=True)
 os.makedirs(BATCHES_DIR, exist_ok=True)
 os.makedirs(WAVEFORMS_DIR, exist_ok=True)
 os.makedirs(SPEAKERS_DIR, exist_ok=True)
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
 DEFAULT_CONFIG = {
     "whisper_model": os.getenv("WHISPER_MODEL", "large-v3"),
@@ -77,11 +92,121 @@ def save_metadata(meta):
         json.dump(meta, f, indent=2)
 
 # -----------------------------
+# Logging helpers
+# -----------------------------
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        base = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        if record.exc_info:
+            base["exc_info"] = self.formatException(record.exc_info)
+        return json.dumps(base, ensure_ascii=False)
+
+logger = logging.getLogger("audio-hub")
+logger.setLevel(logging.INFO)
+
+# Console
+ch = logging.StreamHandler(sys.stdout)
+ch.setFormatter(JsonFormatter())
+logger.addHandler(ch)
+
+# File (rotating)
+fh = RotatingFileHandler(LOG_FILE, maxBytes=5_000_000, backupCount=3)
+fh.setFormatter(JsonFormatter())
+logger.addHandler(fh)
+
+# -----------------------------
+# WebSocket + SSE helpers
+# -----------------------------
+async def notify_batch_progress(batch_id: str):
+    data = PROGRESS_BATCH.get(batch_id, {})
+    dead = []
+    for ws in WS_BATCH.get(batch_id, set()):
+        try:
+            await ws.send_json(data)
+        except WebSocketDisconnect:
+            dead.append(ws)
+    for ws in dead:
+        WS_BATCH[batch_id].discard(ws)
+    # also notify jobcount listeners
+    await notify_jobcount()
+    
+# -----------------------------
+# Single-file helpers
+# -----------------------------
+async def notify_single_progress(progress_id: str):
+    data = PROGRESS_SINGLE.get(progress_id, {})
+    dead = []
+    for ws in WS_SINGLE.get(progress_id, set()):
+        try:
+            await ws.send_json(data)
+        except WebSocketDisconnect:
+            dead.append(ws)
+    for ws in dead:
+        WS_SINGLE[progress_id].discard(ws)
+    await notify_jobcount()
+
+def process_single(progress_id: str, tmp_path: str, mode: str, language: str, target_language: str, response_format: str):
+    PROGRESS_SINGLE[progress_id] = {
+        "status": "running",
+        "total": 1,
+        "completed": 0,
+        "mode": mode,
+        "language": language,
+        "target_language": target_language,
+        "started_at": time.time(),
+    }
+    try:
+        asyncio.run(notify_single_progress(progress_id))
+    except RuntimeError:
+        pass
+
+    task = "translate" if mode == "translate" else "transcribe"
+    lang = target_language if task == "translate" else language
+
+    try:
+        with httpx.Client(timeout=600) as client:
+            logger.info(json.dumps({"event": "single_start", "progress_id": progress_id, "task": task, "language": lang}))
+            resp = client.post(
+                FASTER_WHISPER_URL,
+                files={"audio_file": open(tmp_path, "rb")},
+                data={"task": task, "language": lang},
+            )
+            logger.info(json.dumps({"event": "single_done", "progress_id": progress_id, "status_code": resp.status_code}))
+        data = resp.json()
+    except Exception as e:
+        logger.exception("single_error")
+        PROGRESS_SINGLE[progress_id]["status"] = "error"
+        PROGRESS_SINGLE[progress_id]["error"] = str(e)
+        try:
+            asyncio.run(notify_single_progress(progress_id))
+        except RuntimeError:
+            pass
+        return
+
+    PROGRESS_SINGLE[progress_id]["completed"] = 1
+    PROGRESS_SINGLE[progress_id]["status"] = "completed"
+    PROGRESS_SINGLE[progress_id]["finished_at"] = time.time()
+    PROGRESS_SINGLE[progress_id]["result"] = {
+        "text": data.get("text", ""),
+        "segments": data.get("segments", []),
+        "response_format": response_format,
+    }
+    try:
+        asyncio.run(notify_single_progress(progress_id))
+    except RuntimeError:
+        pass
+
+# -----------------------------
 # XTTS v2
 # -----------------------------
-print("Loading XTTS v2 model…")
+logger.info("Loading XTTS v2 model…")
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
-print("XTTS v2 loaded.")
+logger.info("Loading XTTS v2 model…")
 
 def get_speaker_ref(voice: str):
     path = os.path.join(SPEAKERS_DIR, f"{voice}.wav")
@@ -120,6 +245,138 @@ def segments_to_srt(segments):
     return "\n".join(lines)
 
 # -----------------------------
+# Jobcount notification helper
+# -----------------------------
+async def notify_jobcount():
+    state = {
+        "single": list(PROGRESS_SINGLE.keys()),
+        "batch": list(PROGRESS_BATCH.keys())
+    }
+    dead = []
+    for ws in WS_JOBCOUNT:
+        try:
+            await ws.send_json(state)
+        except WebSocketDisconnect:
+            dead.append(ws)
+    for ws in dead:
+        WS_JOBCOUNT.discard(ws)
+
+# -----------------------------
+# Progress broadcast
+# -----------------------------
+async def notify_progress(batch_id: str):
+    data = PROGRESS.get(batch_id, {})
+    dead = []
+    for ws in WS_CONNECTIONS.get(batch_id, set()):
+        try:
+            await ws.send_json(data)
+        except WebSocketDisconnect:
+            dead.append(ws)
+    for ws in dead:
+        WS_CONNECTIONS[batch_id].discard(ws)
+
+# -----------------------------
+# WebSocket endpoints
+# -----------------------------
+@app.websocket("/ws/progress/{batch_id}")
+async def ws_progress_batch(websocket: WebSocket, batch_id: str):
+    await websocket.accept()
+    WS_BATCH.setdefault(batch_id, set()).add(websocket)
+    try:
+        await websocket.send_json(PROGRESS_BATCH.get(batch_id, {"status": "unknown"}))
+        while True:
+            await websocket.receive_text()  # keep alive
+    except WebSocketDisconnect:
+        WS_BATCH[batch_id].discard(websocket)
+
+@app.websocket("/ws/single/{progress_id}")
+async def ws_progress_single(websocket: WebSocket, progress_id: str):
+    await websocket.accept()
+    WS_SINGLE.setdefault(progress_id, set()).add(websocket)
+    try:
+        await websocket.send_json(PROGRESS_SINGLE.get(progress_id, {"status": "unknown"}))
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        WS_SINGLE[progress_id].discard(websocket)
+
+# -----------------------------
+# SSE endpoint
+# -----------------------------
+@app.get("/v1/progress/{batch_id}")
+async def sse_progress_batch(batch_id: str):
+    async def event_stream():
+        last = None
+        while True:
+            state = PROGRESS_BATCH.get(batch_id)
+            if state != last:
+                last = state
+                yield f"data: {json.dumps(state or {})}\n\n"
+            if state and state.get("status") == "completed":
+                break
+            await asyncio.sleep(1)
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.get("/v1/single-progress/{progress_id}")
+async def sse_progress_single(progress_id: str):
+    async def event_stream():
+        last = None
+        while True:
+            state = PROGRESS_SINGLE.get(progress_id)
+            if state != last:
+                last = state
+                yield f"data: {json.dumps(state or {})}\n\n"
+            if state and state.get("status") == "completed":
+                break
+            await asyncio.sleep(1)
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+# -----------------------------
+# Logs endpoint
+# -----------------------------
+@app.get("/logs")
+async def get_logs(lines: int = 200):
+    if not os.path.exists(LOG_FILE):
+        return {"logs": []}
+    with open(LOG_FILE, "r") as f:
+        all_lines = f.readlines()
+    tail = all_lines[-lines:]
+    return {"logs": [l.rstrip("\n") for l in tail]}
+
+# -----------------------------
+# Jobcount endpoint
+# -----------------------------
+@app.websocket("/ws/jobcount")
+async def ws_jobcount(websocket: WebSocket):
+    await websocket.accept()
+    WS_JOBCOUNT.add(websocket)
+    try:
+        await websocket.send_json({
+            "single": list(PROGRESS_SINGLE.keys()),
+            "batch": list(PROGRESS_BATCH.keys())
+        })
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        WS_JOBCOUNT.discard(websocket)
+
+@app.get("/v1/jobcount")
+async def sse_jobcount():
+    async def event_stream():
+        last = None
+        while True:
+            state = {
+                "single": list(PROGRESS_SINGLE.keys()),
+                "batch": list(PROGRESS_BATCH.keys())
+            }
+            if state != last:
+                last = state
+                yield f"data: {json.dumps(state)}\n\n"
+            await asyncio.sleep(1)
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    
+# -----------------------------
 # OpenAI-compatible endpoints
 # -----------------------------
 @app.get("/v1/models")
@@ -142,13 +399,19 @@ async def transcribe_audio(
         shutil.copyfileobj(file.file, tmp)
         path = tmp.name
 
+    start = time.time()
+    logger.info(f"transcribe_start filename={file.filename} language={language}")
+
     async with httpx.AsyncClient(timeout=1800) as client:
         resp = await client.post(
             FASTER_WHISPER_URL,
             files={"audio_file": open(path, "rb")},
             data={"task": "transcribe", "language": language},
-        )
+        )    
     data = resp.json()
+    
+    elapsed = time.time() - start
+    logger.info(f"transcribe_done filename={file.filename} status_code={resp.status_code} elapsed={elapsed:.2f}")     
 
     if response_format == "srt":
         return segments_to_srt(data["segments"])
@@ -166,6 +429,9 @@ async def translate_audio(
         shutil.copyfileobj(file.file, tmp)
         path = tmp.name
 
+    start = time.time()
+    logger.info(f"translate_start filename={file.filename} language={language}")
+
     async with httpx.AsyncClient(timeout=1800) as client:
         resp = await client.post(
             FASTER_WHISPER_URL,
@@ -173,6 +439,9 @@ async def translate_audio(
             data={"task": "translate", "language": target_language},
         )
     data = resp.json()
+
+    elapsed = time.time() - start
+    logger.info(f"translate_done filename={file.filename} status_code={resp.status_code} elapsed={elapsed:.2f}")  
 
     if response_format == "srt":
         return segments_to_srt(data["segments"])
@@ -253,24 +522,61 @@ async def retrieve_file(file_id: str):
 def process_batch(batch_id, file_ids, task, language):
     batch_path = os.path.join(BATCHES_DIR, batch_id + ".json")
     results = []
+    total = len(file_ids)
 
-    for fid in file_ids:
+    PROGRESS_BATCH[batch_id] = {
+        "status": "running",
+        "total": total,
+        "completed": 0,
+        "current_file": None,
+        "task": task,
+        "language": language,
+        "started_at": time.time(),
+    }
+    logger.info(json.dumps({"event": "batch_start", "batch_id": batch_id, "total": total, "task": task, "language": language}))
+
+    for idx, fid in enumerate(file_ids, start=1):
         fpath = os.path.join(FILES_DIR, fid)
         if not os.path.exists(fpath):
+            logger.warning(json.dumps({"event": "batch_missing_file", "batch_id": batch_id, "file_id": fid}))
             continue
+
+        PROGRESS_BATCH[batch_id]["current_file"] = fid
+        PROGRESS_BATCH[batch_id]["completed"] = idx - 1
+        try:
+            asyncio.run(notify_batch_progress(batch_id))
+        except RuntimeError:
+            pass
 
         with open(fpath, "rb") as audio:
             with httpx.Client(timeout=600) as client:
+                logger.info(json.dumps({"event": "batch_file_start", "batch_id": batch_id, "file_id": fid}))
                 resp = client.post(
                     FASTER_WHISPER_URL,
                     files={"audio_file": audio},
                     data={"task": task, "language": language},
                 )
+                logger.info(json.dumps({"event": "batch_file_done", "batch_id": batch_id, "file_id": fid, "status_code": resp.status_code}))
 
         results.append({"file_id": fid, "result": resp.json()})
 
+        PROGRESS_BATCH[batch_id]["completed"] = idx
+        try:
+            asyncio.run(notify_batch_progress(batch_id))
+        except RuntimeError:
+            pass
+
+    PROGRESS_BATCH[batch_id]["status"] = "completed"
+    PROGRESS_BATCH[batch_id]["finished_at"] = time.time()
+    try:
+        asyncio.run(notify_batch_progress(batch_id))
+    except RuntimeError:
+        pass
+
     with open(batch_path, "w") as f:
         json.dump({"status": "completed", "results": results}, f)
+
+    logger.info(json.dumps({"event": "batch_complete", "batch_id": batch_id, "total": total}))
 
 @app.post("/v1/batches")
 async def create_batch(
@@ -345,6 +651,29 @@ async def ui_transcribe(
     return templates.TemplateResponse(
         "result.html", {"request": request, "content": content}
     )
+
+@app.post("/ui/transcribe_async")
+async def ui_transcribe_async(
+    request: Request,
+    file: UploadFile = File(...),
+    mode: str = Form("transcribe"),
+    language: str = Form("auto"),
+    target_language: str = Form(DEFAULT_TRANSLATION_LANGUAGE),
+    response_format: str = Form("json"),
+):
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        path = tmp.name
+
+    progress_id = str(uuid.uuid4())
+
+    threading.Thread(
+        target=process_single,
+        args=(progress_id, path, mode, language, target_language, response_format),
+        daemon=True,
+    ).start()
+
+    return {"progress_id": progress_id}
 
 @app.post("/ui/batch", response_class=HTMLResponse)
 async def ui_batch(
@@ -543,9 +872,29 @@ async def ui_error(request: Request, message: str = "Error"):
         "error.html", {"request": request, "message": message}
     )
 
-print("=== Audio Hub Configuration ===")
-print(f"FASTER_WHISPER_URL = {FASTER_WHISPER_URL}")
-print(f"Whisper Model      = {DEFAULT_CONFIG['whisper_model']}")
-print(f"XTTS Language      = {DEFAULT_CONFIG['xtts_language']}")
-print(f"XTTS Voice         = {DEFAULT_CONFIG['xtts_voice']}")
-print("================================")
+@app.get("/ui/monitor", response_class=HTMLResponse)
+async def ui_monitor(request: Request):
+    return templates.TemplateResponse("monitor.html", {"request": request})
+
+@app.get("/ui/monitor_data")
+async def ui_monitor_data():
+    return {
+        "single": list(PROGRESS_SINGLE.keys()),
+        "batch": list(PROGRESS_BATCH.keys()),
+    }
+
+@app.get("/ui/logs", response_class=HTMLResponse)
+async def ui_logs(request: Request):
+    return templates.TemplateResponse("logs.html", {"request": request})
+
+@app.get("/ui/dashboard", response_class=HTMLResponse)
+async def ui_dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+    
+logger.info(json.dumps({
+    "event": "config",
+    "FASTER_WHISPER_URL": FASTER_WHISPER_URL,
+    "whisper_model": DEFAULT_CONFIG["whisper_model"],
+    "xtts_language": DEFAULT_CONFIG["xtts_language"],
+    "xtts_voice": DEFAULT_CONFIG["xtts_voice"],
+}, ensure_ascii=False))

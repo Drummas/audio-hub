@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block body %}
+<h1>Job Dashboard</h1>
+
+<div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+  <a href="/ui/logs">View Logs</a>
+  <a href="/ui/files">Files</a>
+  <a href="/ui/settings">Settings</a>
+</div>
+
+<div style="display:flex; gap:20px; flex-wrap:wrap;">
+  <section style="flex:1; min-width:300px;">
+    <h2>Single‑File Jobs</h2>
+    <div id="single-list"></div>
+  </section>
+
+  <section style="flex:1; min-width:300px;">
+    <h2>Batch Jobs</h2>
+    <div id="batch-list"></div>
+  </section>
+</div>
+
+<script>
+function renderCard(type, id, data) {
+  const pct = data.total ? Math.floor((data.completed / data.total) * 100) : 0;
+  const containerId = type === "single" ? "single-list" : "batch-list";
+  const container = document.getElementById(containerId);
+
+  let card = document.getElementById(`${type}-${id}`);
+  if (!card) {
+    card = document.createElement("div");
+    card.id = `${type}-${id}`;
+    card.style.border = "1px solid #444";
+    card.style.borderRadius = "6px";
+    card.style.padding = "10px";
+    card.style.marginBottom = "10px";
+    card.style.background = "#111";
+    container.appendChild(card);
+  }
+
+  card.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div><strong>ID:</strong> <code>${id}</code></div>
+        <div><strong>Status:</strong> ${data.status}</div>
+        <div><strong>Task:</strong> ${data.task || data.mode || "-"}</div>
+      </div>
+      <div style="text-align:right;">
+        <div>${pct}%</div>
+        <progress value="${pct}" max="100" style="width:150px; height:16px;"></progress>
+      </div>
+    </div>
+    <details style="margin-top:8px;">
+      <summary>Details</summary>
+      <pre style="font-size:11px; max-height:200px; overflow:auto;">${JSON.stringify(data, null, 2)}</pre>
+    </details>
+  `;
+}
+
+function connectWS(type, id) {
+  const path = type === "single" ? `single/${id}` : `progress/${id}`;
+  const wsUrl = `ws://${window.location.host}/ws/${path}`;
+  const ws = new WebSocket(wsUrl);
+
+  ws.onmessage = (ev) => {
+    const data = JSON.parse(ev.data);
+    renderCard(type, id, data);
+  };
+
+  ws.onerror = () => ws.close();
+  ws.onclose = () => connectSSE(type, id);
+}
+
+function connectSSE(type, id) {
+  const path = type === "single" ? `single-progress/${id}` : `progress/${id}`;
+  const evt = new EventSource(`/v1/${path}`);
+
+  evt.onmessage = (ev) => {
+    const data = JSON.parse(ev.data);
+    renderCard(type, id, data);
+    if (data.status === "completed") evt.close();
+  };
+
+  evt.onerror = () => evt.close();
+}
+
+fetch("/ui/monitor_data")
+  .then(r => r.json())
+  .then(data => {
+    for (const id of data.single) connectWS("single", id);
+    for (const id of data.batch) connectWS("batch", id);
+  });
+</script>
+{% endblock %}

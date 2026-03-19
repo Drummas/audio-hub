@@ -6,15 +6,67 @@
     <script src="/static/js/theme.js" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
+  <script>
+	// ------------------------------
+	// Active Jobs Badge
+	// ------------------------------
+	const badge = document.getElementById("job-badge");
+
+	function updateBadge(data) {
+	  const single = data.single || [];
+	  const batch = data.batch || [];
+	  const total = single.length + batch.length;
+
+	  badge.textContent = `Jobs: ${total}`;
+	  badge.style.color = total > 0 ? "#0f0" : "#888";
+	  badge.style.borderColor = total > 0 ? "#0f0" : "#444";
+	}
+
+	function connectWS() {
+	  const wsUrl = `ws://${window.location.host}/ws/jobcount`;
+	  const ws = new WebSocket(wsUrl);
+
+	  ws.onmessage = (ev) => updateBadge(JSON.parse(ev.data));
+	  ws.onerror = () => ws.close();
+	  ws.onclose = () => connectSSE();
+	}
+
+	function connectSSE() {
+	  const evt = new EventSource("/v1/jobcount");
+
+	  evt.onmessage = (ev) => {
+		updateBadge(JSON.parse(ev.data));
+	  };
+
+	  evt.onerror = () => evt.close();
+	}
+
+	// Start WebSocket → fallback to SSE
+	connectWS();  
+  </script>  
   <body>
     <div class="layout">
       <aside class="sidebar">
         <h2>Audio Hub</h2>
-        <nav>
-          <a href="/">Home</a>
-          <a href="/ui/files">Files</a>
-          <a href="/ui/settings">Settings</a>
-        </nav>
+		<nav style="display:flex; gap:20px; align-items:center;">
+		  <a href="/">Home</a>
+		  <a href="/ui/settings">Settings</a>
+		  <a href="/ui/files">Files</a>
+		  <a href="/ui/dashboard">Dashboard</a>
+		  <a href="/ui/logs">Logs</a>
+
+		  <span id="job-badge" style="
+			margin-left:auto;
+			background:#222;
+			color:#0f0;
+			padding:4px 10px;
+			border-radius:12px;
+			font-size:12px;
+			border:1px solid #0f0;
+		  ">
+			Jobs: 0
+		  </span>
+		</nav>
         <div class="theme-toggle">
           <button type="button" onclick="toggleTheme()">Toggle theme</button>
         </div>

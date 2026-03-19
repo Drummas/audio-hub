@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block body %}
+<h1>Logs</h1>
+
+<div style="margin-bottom:10px;">
+  <button id="pause-btn">Pause</button>
+  <button id="resume-btn" disabled>Resume</button>
+  <label style="margin-left:10px;">
+    Lines:
+    <input id="lines-input" type="number" value="200" min="50" max="2000" step="50" style="width:80px;">
+  </label>
+</div>
+
+<pre id="logs-box" style="
+  background:#111;
+  color:#eee;
+  padding:10px;
+  border-radius:6px;
+  max-height:70vh;
+  overflow:auto;
+  font-size:12px;
+  line-height:1.3;
+"></pre>
+
+<script>
+let paused = false;
+let timer = null;
+
+const logsBox = document.getElementById("logs-box");
+const pauseBtn = document.getElementById("pause-btn");
+const resumeBtn = document.getElementById("resume-btn");
+const linesInput = document.getElementById("lines-input");
+
+pauseBtn.onclick = () => {
+  paused = true;
+  pauseBtn.disabled = true;
+  resumeBtn.disabled = false;
+};
+
+resumeBtn.onclick = () => {
+  paused = false;
+  pauseBtn.disabled = false;
+  resumeBtn.disabled = true;
+  fetchLogs();
+};
+
+function fetchLogs() {
+  if (paused) return;
+  const lines = linesInput.value || 200;
+  fetch(`/logs?lines=${lines}`)
+    .then(r => r.json())
+    .then(data => {
+      logsBox.textContent = data.logs.join("\n");
+      logsBox.scrollTop = logsBox.scrollHeight;
+    })
+    .catch(console.error);
+}
+
+timer = setInterval(fetchLogs, 2000);
+fetchLogs();
+</script>
+{% endblock %}

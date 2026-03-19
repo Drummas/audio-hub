@@ -34,7 +34,14 @@ document.addEventListener("DOMContentLoaded", () => {
 </p>
 
 <h2>Transcribe / Translate</h2>
-<form action="/ui/transcribe" method="post" enctype="multipart/form-data">
+
+<div id="single-progress-container" style="display:none; margin:20px 0;">
+  <label>Progress:</label>
+  <progress id="single-progress-bar" value="0" max="100" style="width:100%; height:25px;"></progress>
+  <p id="single-progress-text">Starting…</p>
+</div>
+
+<form id="single-form" enctype="multipart/form-data">
   <fieldset>
     <div id="drop-zone" style="border:2px dashed #444;padding:1rem;border-radius:8px;margin-bottom:1rem;cursor:pointer;">
       Drop audio file here or click to select.
@@ -62,6 +69,76 @@ document.addEventListener("DOMContentLoaded", () => {
   </fieldset>
   <button type="submit">Run</button>
 </form>
+
+<script>
+// ------------------------------
+// Single-file progress handling
+// ------------------------------
+const singleForm = document.getElementById("single-form");
+const singleProgress = document.getElementById("single-progress-container");
+const singleBar = document.getElementById("single-progress-bar");
+const singleText = document.getElementById("single-progress-text");
+
+singleForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  singleProgress.style.display = "block";
+  singleBar.value = 0;
+  singleText.textContent = "Uploading…";
+
+  const formData = new FormData(singleForm);
+
+  // Submit to async endpoint
+  const resp = await fetch("/ui/transcribe_async", {
+    method: "POST",
+    body: formData
+  });
+
+  const result = await resp.json();
+  const progressId = result.progress_id;
+
+  singleText.textContent = "Processing…";
+
+  connectWS(progressId);
+});
+
+function updateSingleProgress(data) {
+  if (!data || !data.total) return;
+
+  const pct = Math.floor((data.completed / data.total) * 100);
+  singleBar.value = pct;
+  singleText.textContent = `${pct}% — ${data.completed} / ${data.total}`;
+
+  if (data.status === "completed") {
+    singleText.textContent = "Completed!";
+  }
+}
+
+function connectWS(id) {
+  const wsUrl = `ws://${window.location.host}/ws/single/${id}`;
+  const ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => console.log("WS connected");
+  ws.onmessage = (ev) => updateSingleProgress(JSON.parse(ev.data));
+  ws.onerror = () => {
+    console.warn("WS failed, falling back to SSE");
+    ws.close();
+  };
+  ws.onclose = () => connectSSE(id);
+}
+
+function connectSSE(id) {
+  const evt = new EventSource(`/v1/single-progress/${id}`);
+
+  evt.onmessage = (ev) => {
+    const data = JSON.parse(ev.data);
+    updateSingleProgress(data);
+    if (data.status === "completed") evt.close();
+  };
+
+  evt.onerror = () => evt.close();
+}
+</script>
 
 <h2>Batch Job</h2>
 <form action="/ui/batch" method="post" enctype="multipart/form-data">
