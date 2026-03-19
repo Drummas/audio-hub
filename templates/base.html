@@ -6,203 +6,61 @@
     <script src="/static/js/theme.js" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
-  <script>
-	// ------------------------------
-	// Active Jobs Badge
-	// ------------------------------
-	const badge = document.getElementById("job-badge");
-
-	function updateBadge(data) {
-	  const single = data.single || [];
-	  const batch = data.batch || [];
-	  const total = single.length + batch.length;
-
-	  badge.textContent = `Jobs: ${total}`;
-	  badge.style.color = total > 0 ? "#0f0" : "#888";
-	  badge.style.borderColor = total > 0 ? "#0f0" : "#444";
-	}
-
-	function connectWS() {
-	  const wsUrl = `ws://${window.location.host}/ws/jobcount`;
-	  const ws = new WebSocket(wsUrl);
-
-	  ws.onmessage = (ev) => updateBadge(JSON.parse(ev.data));
-	  ws.onerror = () => ws.close();
-	  ws.onclose = () => connectSSE();
-	}
-
-	function connectSSE() {
-	  const evt = new EventSource("/v1/jobcount");
-
-	  evt.onmessage = (ev) => {
-		updateBadge(JSON.parse(ev.data));
-	  };
-
-	  evt.onerror = () => evt.close();
-	}
-
-	// Start WebSocket → fallback to SSE
-	connectWS();  
-  </script>  
   <body>
-    <div class="layout">
-      <aside class="sidebar">
-        <h2>Audio Hub</h2>
-		<style>
-		/* NAV CONTAINER */
-		nav {
-		  display: flex;
-		  align-items: center;
-		  justify-content: space-between;
-		  padding: 10px 0;
-		  border-bottom: 1px solid #333;
-		  position: relative;
-		  z-index: 10;
-		}
 
-		/* LEFT SIDE (hamburger + desktop menu) */
-		.nav-left {
-		  display: flex;
-		  align-items: center;
-		  gap: 20px;
-		}
+	  {% include "nav.html" %}
 
-		/* DESKTOP MENU */
-		.nav-links {
-		  display: flex;
-		  gap: 20px;
-		  align-items: center;
-		}
-
-		.nav-links a {
-		  color: #ccc;
-		  text-decoration: none;
-		  display: flex;
-		  align-items: center;
-		  gap: 6px;
-		}
-
-		.nav-links a:hover {
-		  color: #fff;
-		}
-
-		/* RIGHT SIDE (theme toggle + badge) */
-		.nav-right {
-		  display: flex;
-		  align-items: center;
-		  gap: 15px;
-		  white-space: nowrap;
-		}
-
-		/* ICONS */
-		.nav-icon {
-		  width: 16px;
-		  height: 16px;
-		  fill: currentColor;
-		}
-
-		/* HAMBURGER */
-		.hamburger {
-		  display: none;
-		  cursor: pointer;
-		  flex-direction: column;
-		  gap: 4px;
-		}
-
-		.hamburger div {
-		  width: 22px;
-		  height: 2px;
-		  background: #ccc;
-		}
-
-		/* MOBILE MENU */
-		#mobile-menu {
-		  display: none;
-		  flex-direction: column;
-		  gap: 15px;
-		  padding: 10px 0;
-		  background: #111;
-		  border-bottom: 1px solid #333;
-		}
-
-		#mobile-menu a {
-		  color: #ccc;
-		  text-decoration: none;
-		  display: flex;
-		  align-items: center;
-		  gap: 6px;
-		}
-
-		/* RESPONSIVE RULES */
-		@media (max-width: 750px) {
-		  .nav-links {
-			display: none;
-		  }
-		  .hamburger {
-			display: flex;
-		  }
-		  #mobile-menu.open {
-			display: flex;
-		  }
-		}
-		</style>
-
-		<nav>
-		  <div class="nav-left">
-			<!-- Hamburger (mobile only) -->
-			<div class="hamburger" id="hamburger">
-			  <div></div><div></div><div></div>
+	  <div class="layout">
+		<aside class="sidebar">
+			<h2>Audio Hub</h2>
+			<div class="theme-toggle">
+			  <button type="button" onclick="toggleTheme()">Toggle theme</button>
 			</div>
+		</aside>
+		<main class="main">
+			{% block body %}{% endblock %}
+		</main>
+	  </div>
+	  <script>
+		// ------------------------------
+		// Active Jobs Badge
+		// ------------------------------
+		const badge = document.getElementById("job-badge");
 
-			<!-- Desktop menu -->
-			<div class="nav-links">
-			  <a href="/"><svg class="nav-icon"><use href="#icon-home"/></svg>Home</a>
-			  <a href="/ui/settings"><svg class="nav-icon"><use href="#icon-settings"/></svg>Settings</a>
-			  <a href="/ui/files"><svg class="nav-icon"><use href="#icon-folder"/></svg>Files</a>
-			  <a href="/ui/dashboard"><svg class="nav-icon"><use href="#icon-dashboard"/></svg>Dashboard</a>
-			  <a href="/ui/logs"><svg class="nav-icon"><use href="#icon-logs"/></svg>Logs</a>
-			</div>
-		  </div>
+		function updateBadge(data) {
+		  const single = data.single || [];
+		  const batch = data.batch || [];
+		  const total = single.length + batch.length;
 
-		  <div class="nav-right">
-			<button id="theme-toggle" style="
-			  background:#111;
-			  color:#ccc;
-			  border:1px solid #444;
-			  padding:4px 8px;
-			  border-radius:6px;
-			  cursor:pointer;
-			">Theme</button>
+		  badge.textContent = `Jobs: ${total}`;
+		  badge.style.color = total > 0 ? "#0f0" : "#888";
+		  badge.style.borderColor = total > 0 ? "#0f0" : "#444";
+		}
 
-			<span id="job-badge" style="
-			  background:#111;
-			  color:#0f0;
-			  padding:4px 10px;
-			  border-radius:12px;
-			  font-size:12px;
-			  border:1px solid #0f0;
-			">Jobs: 0</span>
-		  </div>
-		</nav>
-		<!-- Mobile dropdown -->
-		<div id="mobile-menu">
-		  <a href="/"><svg class="nav-icon"><use href="#icon-home"/></svg>Home</a>
-		  <a href="/ui/settings"><svg class="nav-icon"><use href="#icon-settings"/></svg>Settings</a>
-		  <a href="/ui/files"><svg class="nav-icon"><use href="#icon-folder"/></svg>Files</a>
-		  <a href="/ui/dashboard"><svg class="nav-icon"><use href="#icon-dashboard"/></svg>Dashboard</a>
-		  <a href="/ui/logs"><svg class="nav-icon"><use href="#icon-logs"/></svg>Logs</a>
-		</div>
+		function connectWS() {
+		  const wsUrl = `ws://${window.location.host}/ws/jobcount`;
+		  const ws = new WebSocket(wsUrl);
 
-        <div class="theme-toggle">
-          <button type="button" onclick="toggleTheme()">Toggle theme</button>
-        </div>
-      </aside>
-      <main class="main">
-        {% block body %}{% endblock %}
-      </main>
-    </div>
-  </body>
-  <svg style="display:none;">
+		  ws.onmessage = (ev) => updateBadge(JSON.parse(ev.data));
+		  ws.onerror = () => ws.close();
+		  ws.onclose = () => connectSSE();
+		}
+
+		function connectSSE() {
+		  const evt = new EventSource("/v1/jobcount");
+
+		  evt.onmessage = (ev) => {
+			updateBadge(JSON.parse(ev.data));
+		  };
+
+		  evt.onerror = () => evt.close();
+		}
+
+		// Start WebSocket → fallback to SSE
+		connectWS();  
+	  </script>   
+	</body>
+	<svg style="display:none;">
 	  <symbol id="icon-home" viewBox="0 0 24 24">
 		<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2h-4v-6h-6v6H5a2 2 0 0 1-2-2z"/>
 	  </symbol>
@@ -222,17 +80,17 @@
 	  <symbol id="icon-logs" viewBox="0 0 24 24">
 		<path d="M4 4h16v2H4zm0 6h16v2H4zm0 6h10v2H4z"/>
 	  </symbol>
-  </svg>
-<script>
-	const hamburger = document.getElementById("hamburger");
-	const mobileMenu = document.getElementById("mobile-menu");
+	</svg>
+	<script>
+		const hamburger = document.getElementById("hamburger");
+		const mobileMenu = document.getElementById("mobile-menu");
 
-	hamburger.addEventListener("click", () => {
-	  mobileMenu.classList.toggle("open");
-	});
+		hamburger.addEventListener("click", () => {
+		  mobileMenu.classList.toggle("open");
+		});
 
-	document.getElementById("theme-toggle").addEventListener("click", () => {
-	  document.body.classList.toggle("light-theme");
-	});
-</script>
+		document.getElementById("theme-toggle").addEventListener("click", () => {
+		  document.body.classList.toggle("light-theme");
+		});
+	</script>
 </html>
