@@ -38,7 +38,7 @@ DEFAULT_CONFIG = {
     "whisper_model": os.getenv("WHISPER_MODEL", "large-v3"),
     "xtts_language": os.getenv("XTTS_LANGUAGE", "en"),
     "xtts_voice": os.getenv("XTTS_VOICE", "default"),
-    "default_translation_language": DEFAULT_TRANSLATION_LANGUAGE,
+    "default_translation_language": os.getenv("DEFAULT_TRANSLATION_LANGUAGE", "pt"),
 }
 
 # -----------------------------
