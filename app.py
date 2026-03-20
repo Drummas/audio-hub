@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from logging.handlers import RotatingFileHandler
+from collections import deque
 
 import httpx
 from TTS.api import TTS
@@ -41,6 +42,10 @@ PROGRESS_SINGLE: dict[str, dict] = {}
 WS_BATCH: dict[str, set[WebSocket]] = {}
 WS_SINGLE: dict[str, set[WebSocket]] = {}
 WS_JOBCOUNT = set()
+CPU_HISTORY = deque(maxlen=60)
+RAM_HISTORY = deque(maxlen=60)
+NET_LAST = psutil.net_io_counters()
+DISK_LAST = psutil.disk_io_counters()
 FASTER_WHISPER_URL = os.getenv(
     "FASTER_WHISPER_URL",
     "http://faster-whisper:10300/inference"
@@ -311,14 +316,19 @@ def get_cache_health(path):
     }
 
 def get_system_info():
+    mem = psutil.virtual_memory()
+    cpu_percent = psutil.cpu_percent(interval=None)
+
     uptime = datetime.datetime.now() - datetime.datetime.fromtimestamp(psutil.boot_time())
+
     return {
         "platform": platform.platform(),
         "python": platform.python_version(),
-        "cpu_count": psutil.cpu_count(),
-        "load_avg": psutil.getloadavg(),
-        "memory": dict(psutil.virtual_memory()._asdict()),
-        "uptime": str(uptime)  # <-- FIX HERE
+        "cpu_percent": cpu_percent,
+        "memory_percent": mem.percent,
+        "memory_used": mem.used,
+        "memory_total": mem.total,
+        "uptime": str(uptime)
     }
 
 # -----------------------------
@@ -468,6 +478,56 @@ async def ui_system(request: Request):
         "request": request,
         "data": data
     })
+
+# -----------------------------
+# Live system stats endpoint
+# -----------------------------
+@app.get("/api/system_stats")
+async def system_stats():
+    # CPU
+    cpu = psutil.cpu_percent(interval=None)
+    CPU_HISTORY.append(cpu)
+
+    # RAM
+    mem = psutil.virtual_memory()
+    RAM_HISTORY.append(mem.percent)
+
+    # Disk I/O
+    disk_now = psutil.disk_io_counters()
+    disk_read = disk_now.read_bytes - DISK_LAST.read_bytes
+    disk_write = disk_now.write_bytes - DISK_LAST.write_bytes
+
+    global DISK_LAST
+    DISK_LAST = disk_now
+
+    # Network throughput
+    net_now = psutil.net_io_counters()
+    net_recv = net_now.bytes_recv - NET_LAST.bytes_recv
+    net_sent = net_now.bytes_sent - NET_LAST.bytes_sent
+
+    global NET_LAST
+    NET_LAST = net_now
+
+    # Temperatures (if available)
+    try:
+        temps = psutil.sensors_temperatures()
+    except Exception:
+        temps = {}
+
+    return {
+        "system": get_system_info(),
+        "cpu_history": list(CPU_HISTORY),
+        "ram_history": list(RAM_HISTORY),
+        "disk_io": {
+            "read": disk_read,
+            "write": disk_write
+        },
+        "network": {
+            "recv": net_recv,
+            "sent": net_sent
+        },
+        "temps": temps
+    }
 
 # -----------------------------
 # Clear cache + rebuild models endpoint
