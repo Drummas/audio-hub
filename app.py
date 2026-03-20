@@ -294,9 +294,9 @@ async def notify_jobcount():
 # Model helper
 # -----------------------------
 def get_effective_whisper_model():
-    if CONFIG["whisper_model_override"]:
-        return CONFIG["whisper_model_override"]
-    return CONFIG["whisper_model"]
+    if DEFAULT_CONFIG["whisper_model_override"]:
+        return DEFAULT_CONFIG["whisper_model_override"]
+    return DEFAULT_CONFIG["whisper_model"]
 
 # -----------------------------
 # Disk + model stats
@@ -399,8 +399,8 @@ def estimate_recommended_model(cpu_count: int, tokens_per_second: float, has_gpu
 # Timeout config
 # -----------------------------
 async def set_timeout(cfg: TimeoutConfig):
-    CONFIG["whisper_timeout"] = max(60, min(cfg.timeout, 7200))
-    return {"status": "ok", "timeout": CONFIG["whisper_timeout"]}
+    DEFAULT_CONFIG["whisper_timeout"] = max(60, min(cfg.timeout, 7200))
+    return {"status": "ok", "timeout": DEFAULT_CONFIG["whisper_timeout"]}
 
 
 # -----------------------------
@@ -408,9 +408,9 @@ async def set_timeout(cfg: TimeoutConfig):
 # -----------------------------
 @app.post("/api/set_model_config")
 async def set_model_config(cfg: ModelConfig):
-    CONFIG["auto_model_enabled"] = cfg.auto_enabled
-    CONFIG["whisper_model_override"] = cfg.override_model
-    return {"status": "ok", "config": CONFIG}
+    DEFAULT_CONFIG["auto_model_enabled"] = cfg.auto_enabled
+    DEFAULT_CONFIG["whisper_model_override"] = cfg.override_model
+    return {"status": "ok", "config": DEFAULT_CONFIG}
 
 # -----------------------------
 # Speedtest endpoint
@@ -427,7 +427,7 @@ async def model_speedtest():
     url = os.getenv("FASTER_WHISPER_URL", "http://faster-whisper:10300/inference")
 
     start = time.time()
-    with httpx.Client(timeout=CONFIG["whisper_timeout"]) as client:
+    with httpx.Client(timeout=DEFAULT_CONFIG["whisper_timeout"]) as client:
         resp = client.post(
             url,
             files={"audio_file": ("test.raw", audio_bytes, "application/octet-stream")},
@@ -445,7 +445,7 @@ async def model_speedtest():
     recommended = estimate_recommended_model(sysinfo["cpu_count"], tps, has_gpu)
 
     return {
-        "model": CONFIG["whisper_model"],
+        "model": DEFAULT_CONFIG["whisper_model"],
         "processing_seconds": elapsed,
         "tokens_per_second": tps,
         "estimated_minutes_per_minute": (elapsed / 60) / (duration / 60),
@@ -642,7 +642,7 @@ async def system_stats():
         "disk_io": {"read": disk_read, "write": disk_write},
         "network": {"recv": net_recv, "sent": net_sent},
         "temps": temps,
-        "config": CONFIG,
+        "config": DEFAULT_CONFIG,
     }
 
 # -----------------------------
