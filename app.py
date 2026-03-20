@@ -1181,6 +1181,14 @@ async def ui_settings(request: Request):
         "settings.html", {"request": request, "cfg": cfg}
     )
 
+@app.get("/ui/performance", response_class=HTMLResponse)
+async def ui_performance(request: Request):
+async def ui_settings(request: Request):
+    cfg = load_config()
+    return templates.TemplateResponse(
+        "performance.html", {"request": request, "cfg": cfg}
+    )
+
 @app.post("/ui/settings", response_class=HTMLResponse)
 async def ui_settings_post(
     request: Request,
