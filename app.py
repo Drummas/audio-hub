@@ -311,13 +311,14 @@ def get_cache_health(path):
     }
 
 def get_system_info():
+    uptime = datetime.datetime.now() - datetime.datetime.fromtimestamp(psutil.boot_time())
     return {
         "platform": platform.platform(),
         "python": platform.python_version(),
         "cpu_count": psutil.cpu_count(),
         "load_avg": psutil.getloadavg(),
         "memory": dict(psutil.virtual_memory()._asdict()),
-        "uptime": datetime.datetime.now() - datetime.datetime.fromtimestamp(psutil.boot_time())
+        "uptime": str(uptime)  # <-- FIX HERE
     }
 
 # -----------------------------
