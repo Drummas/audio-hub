@@ -484,6 +484,11 @@ async def ui_system(request: Request):
 # -----------------------------
 @app.get("/api/system_stats")
 async def system_stats():
+    global NET_LAST
+    global DISK_LAST
+    global CPU_HISTORY
+    global RAM_HISTORY
+
     # CPU
     cpu = psutil.cpu_percent(interval=None)
     CPU_HISTORY.append(cpu)
@@ -496,19 +501,15 @@ async def system_stats():
     disk_now = psutil.disk_io_counters()
     disk_read = disk_now.read_bytes - DISK_LAST.read_bytes
     disk_write = disk_now.write_bytes - DISK_LAST.write_bytes
-
-    global DISK_LAST
     DISK_LAST = disk_now
 
     # Network throughput
     net_now = psutil.net_io_counters()
     net_recv = net_now.bytes_recv - NET_LAST.bytes_recv
     net_sent = net_now.bytes_sent - NET_LAST.bytes_sent
-
-    global NET_LAST
     NET_LAST = net_now
 
-    # Temperatures (if available)
+    # Temperatures
     try:
         temps = psutil.sensors_temperatures()
     except Exception:
