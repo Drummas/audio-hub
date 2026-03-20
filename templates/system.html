@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block body %}
-<h1>System Status</h1>
+<h1>System & Performance</h1>
 
 <style>
 .sys-card {
@@ -11,7 +11,6 @@
   border-radius:8px;
   margin-bottom:20px;
 }
-
 .bar {
   width:100%;
   height:18px;
@@ -20,59 +19,58 @@
   overflow:hidden;
   margin-top:6px;
 }
-
 .bar-fill {
   height:100%;
   background:#0f0;
   width:0%;
   transition:width 0.3s ease;
 }
-
 .label {
   font-size:14px;
   margin-top:6px;
 }
-
 .sparkline {
-  height: 40px;
-  width: 100%;
-  background: #222;
-  border-radius: 4px;
-  margin-top: 10px;
+  height:40px;
+  width:100%;
+  background:#222;
+  border-radius:4px;
+  margin-top:10px;
 }
-
 .sparkline canvas {
-  width: 100%;
-  height: 40px;
+  width:100%;
+  height:40px;
 }
-
 .io-box, .net-box, .temp-box {
-  margin-top: 10px;
-  padding: 10px;
-  background: #111;
-  border: 1px solid #333;
-  border-radius: 6px;
+  margin-top:10px;
+  padding:10px;
+  background:#111;
+  border:1px solid #333;
+  border-radius:6px;
 }
-
 .health {
-  font-size: 20px;
-  font-weight: bold;
-  margin-bottom: 10px;
+  font-size:20px;
+  font-weight:bold;
+  margin-bottom:10px;
 }
-
-.health.ok { color: #0f0; }
-.health.warn { color: #ff0; }
-.health.crit { color: #f33; }
-
+.health.ok { color:#0f0; }
+.health.warn { color:#ff0; }
+.health.crit { color:#f33; }
 .advanced-toggle {
-  cursor: pointer;
-  color: #0af;
-  margin-top: 20px;
+  cursor:pointer;
+  color:#0af;
+  margin-top:20px;
 }
-
 .advanced-panel {
-  display: none;
-  margin-top: 10px;
+  display:none;
+  margin-top:10px;
+}
+.config-row {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:10px;
+  flex-wrap:wrap;
+}
 </style>
 
 <div class="sys-card">
@@ -86,13 +84,15 @@
   <h2>Memory Usage</h2>
   <div class="label" id="ram-label">0%</div>
   <div class="bar"><div class="bar-fill" id="ram-bar"></div></div>
-  <div class="sparkline"><canvas id="ram-spark"></canvas></div>  
+  <div class="sparkline"><canvas id="ram-spark"></canvas></div>
 </div>
 
 <div class="sys-card">
   <h2>Disk Usage</h2>
   <div id="disk-container"></div>
+</div>
 
+<div class="sys-card">
   <h2>Disk I/O</h2>
   <div class="io-box">
     Read: <span id="disk-read">0</span> B/s<br>
@@ -118,11 +118,48 @@
   <div id="health-indicator" class="health ok">OK</div>
 </div>
 
-<div class="advanced-toggle" id="adv-toggle">Show advanced metrics ▼</div>
-<div class="advanced-panel" id="adv-panel">
-  <pre id="raw-json"></pre>
+<div class="sys-card">
+  <h2>Whisper Performance & Config</h2>
+
+  <div class="config-row">
+    <button id="speedtest-btn">Run Model Speed Test</button>
+    <span id="speedtest-result"></span>
+  </div>
+
+  <div class="config-row">
+    <label>Recommended Model:</label>
+    <span id="recommended-model">Run speed test to calculate</span>
+  </div>
+
+  <div class="config-row">
+    <label>Timeout (seconds):</label>
+    <input type="number" id="timeout-input" min="60" max="7200" step="30">
+    <button id="timeout-save">Save</button>
+    <span id="timeout-status"></span>
+  </div>
+
+  <div class="config-row">
+    <label><input type="checkbox" id="auto-model"> Enable Auto Model Selection</label>
+    <label>Override Model:</label>
+    <select id="override-model">
+      <option value="">None</option>
+      <option value="tiny">tiny</option>
+      <option value="base">base</option>
+      <option value="small">small</option>
+      <option value="medium">medium</option>
+      <option value="large-v3">large-v3</option>
+    </select>
+    <button id="model-save">Save Model Config</button>
+    <span id="model-status"></span>
+  </div>
 </div>
 
+<div class="sys-card">
+  <div class="advanced-toggle" id="adv-toggle">Show advanced metrics ▼</div>
+  <div class="advanced-panel" id="adv-panel">
+    <pre id="raw-json"></pre>
+  </div>
+</div>
 
 <script>
 function drawSparkline(canvas, data) {
@@ -131,6 +168,8 @@ function drawSparkline(canvas, data) {
   const h = canvas.height = canvas.offsetHeight;
 
   ctx.clearRect(0, 0, w, h);
+  if (!data || data.length === 0) return;
+
   ctx.strokeStyle = "#0f0";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -147,7 +186,6 @@ function drawSparkline(canvas, data) {
 
 function updateHealth(cpu, ram, disk) {
   const el = document.getElementById("health-indicator");
-
   if (cpu < 70 && ram < 70 && disk < 80) {
     el.textContent = "OK";
     el.className = "health ok";
@@ -168,33 +206,28 @@ async function refreshStats() {
   const cpu = data.system.cpu_percent;
   document.getElementById("cpu-label").textContent = cpu + "%";
   document.getElementById("cpu-bar").style.width = cpu + "%";
+  drawSparkline(document.getElementById("cpu-spark"), data.cpu_history);
 
   // RAM
   const ram = data.system.memory_percent;
   document.getElementById("ram-label").textContent = ram + "%";
   document.getElementById("ram-bar").style.width = ram + "%";
+  drawSparkline(document.getElementById("ram-spark"), data.ram_history);
 
-  // Disk
+  // Disk usage
   const diskDiv = document.getElementById("disk-container");
   diskDiv.innerHTML = "";
-
-  data.disk.forEach(d => {
-    const wrap = document.createElement("div");
-    wrap.style.marginBottom = "12px";
-
-    wrap.innerHTML = `
-      <div class="label">${d.path}: ${d.percent}%</div>
-      <div class="bar"><div class="bar-fill" style="width:${d.percent}%;"></div></div>
-    `;
-
-    diskDiv.appendChild(wrap);
-  });
-  
-  // CPU sparkline
-  drawSparkline(document.getElementById("cpu-spark"), data.cpu_history);
-
-  // RAM sparkline
-  drawSparkline(document.getElementById("ram-spark"), data.ram_history);
+  if (data.disk) {
+    data.disk.forEach(d => {
+      const wrap = document.createElement("div");
+      wrap.style.marginBottom = "12px";
+      wrap.innerHTML = `
+        <div class="label">${d.path}: ${d.percent}%</div>
+        <div class="bar"><div class="bar-fill" style="width:${d.percent}%;"></div></div>
+      `;
+      diskDiv.appendChild(wrap);
+    });
+  }
 
   // Disk I/O
   document.getElementById("disk-read").textContent = data.disk_io.read;
@@ -204,10 +237,10 @@ async function refreshStats() {
   document.getElementById("net-recv").textContent = data.network.recv;
   document.getElementById("net-sent").textContent = data.network.sent;
 
-  // Temperatures
+  // Temps
   const tempBox = document.getElementById("temp-box");
   tempBox.innerHTML = "";
-  if (Object.keys(data.temps).length === 0) {
+  if (!data.temps || Object.keys(data.temps).length === 0) {
     tempBox.textContent = "No sensors detected";
   } else {
     for (const chip in data.temps) {
@@ -217,24 +250,62 @@ async function refreshStats() {
     }
   }
 
-  // Health indicator
-  const cpu = data.system.cpu_percent;
-  const ram = data.system.memory_percent;
-  const disk = data.disk[0].percent;
-  updateHealth(cpu, ram, disk);
+  // Health
+  const diskPercent = data.disk && data.disk.length ? data.disk[0].percent : 0;
+  updateHealth(cpu, ram, diskPercent);
 
-  // Advanced panel
+  // Config
+  document.getElementById("timeout-input").value = data.config.whisper_timeout;
+  document.getElementById("auto-model").checked = data.config.auto_model_enabled;
+  document.getElementById("override-model").value = data.config.whisper_model_override || "";
+
+  // Advanced
   document.getElementById("raw-json").textContent = JSON.stringify(data, null, 2);
 }
 
-// Toggle advanced panel
+// Advanced toggle
 document.getElementById("adv-toggle").onclick = () => {
   const panel = document.getElementById("adv-panel");
-  panel.style.display = panel.style.display === "block" ? "none" : "block";
-};  
-}
+  const open = panel.style.display === "block";
+  panel.style.display = open ? "none" : "block";
+  document.getElementById("adv-toggle").textContent = open ? "Show advanced metrics ▼" : "Hide advanced metrics ▲";
+};
 
-// Refresh every 2 seconds
+// Speed test
+document.getElementById("speedtest-btn").onclick = async () => {
+  const el = document.getElementById("speedtest-result");
+  el.textContent = "Running speed test…";
+  const resp = await fetch("/api/model_speedtest", { method: "POST" });
+  const data = await resp.json();
+  el.textContent = `Model: ${data.model}, ${data.processing_seconds.toFixed(2)}s for 5s audio, ~${data.estimated_minutes_per_minute.toFixed(2)}x realtime`;
+  document.getElementById("recommended-model").textContent = data.recommended_model;
+};
+
+// Timeout save
+document.getElementById("timeout-save").onclick = async () => {
+  const val = parseInt(document.getElementById("timeout-input").value, 10);
+  const resp = await fetch("/api/set_timeout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ timeout: val })
+  });
+  const data = await resp.json();
+  document.getElementById("timeout-status").textContent = `Saved: ${data.timeout}s`;
+};
+
+// Model config save
+document.getElementById("model-save").onclick = async () => {
+  const autoEnabled = document.getElementById("auto-model").checked;
+  const override = document.getElementById("override-model").value || null;
+  const resp = await fetch("/api/set_model_config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ auto_enabled: autoEnabled, override_model: override })
+  });
+  const data = await resp.json();
+  document.getElementById("model-status").textContent = "Saved";
+};
+
 setInterval(refreshStats, 2000);
 refreshStats();
 </script>

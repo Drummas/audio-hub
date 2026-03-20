@@ -10,7 +10,11 @@ import tempfile
 import logging
 import sys
 import time
+import math
 import asyncio
+import httpx
+import numpy as np
+from pydantic import BaseModel
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
@@ -18,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from logging.handlers import RotatingFileHandler
 from collections import deque
+from queue import Queue
 
 import httpx
 from TTS.api import TTS
@@ -50,6 +55,7 @@ FASTER_WHISPER_URL = os.getenv(
     "FASTER_WHISPER_URL",
     "http://faster-whisper:10300/inference"
 )
+CHUNK_QUEUE: Queue = Queue()
 
 os.makedirs(FILES_DIR, exist_ok=True)
 os.makedirs(BATCHES_DIR, exist_ok=True)
@@ -59,6 +65,9 @@ os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 
 DEFAULT_CONFIG = {
     "whisper_model": os.getenv("WHISPER_MODEL", "large-v3"),
+    "whisper_timeout": os.getenv("WHISPER_TIMEOUT", 600),
+    "whisper_model_override": os.getenv("WHISPER_MODEL_OVERRIDE", None),
+    "auto_model_enabled": os.getenv("AUTO_MODEL_ENABLED", True),    
     "xtts_language": os.getenv("XTTS_LANGUAGE", "en"),
     "xtts_voice": os.getenv("XTTS_VOICE", "default"),
     "default_translation_language": os.getenv("DEFAULT_TRANSLATION_LANGUAGE", "pt"),
@@ -126,6 +135,18 @@ logger.addHandler(ch)
 fh = RotatingFileHandler(LOG_FILE, maxBytes=5_000_000, backupCount=3)
 fh.setFormatter(JsonFormatter())
 logger.addHandler(fh)
+
+class TimeoutConfig(BaseModel):
+    timeout: int
+
+class ModelConfig(BaseModel):
+    auto_enabled: bool
+    override_model: str | None
+
+class ChunkJob(BaseModel):
+    file_id: str
+    language: str
+    task: str  # "transcribe" or "translate"
 
 # -----------------------------
 # WebSocket + SSE helpers
@@ -270,6 +291,14 @@ async def notify_jobcount():
         WS_JOBCOUNT.discard(ws)
 
 # -----------------------------
+# Model helper
+# -----------------------------
+def get_effective_whisper_model():
+    if CONFIG["whisper_model_override"]:
+        return CONFIG["whisper_model_override"]
+    return CONFIG["whisper_model"]
+
+# -----------------------------
 # Disk + model stats
 # -----------------------------
 def get_disk_usage(path):
@@ -315,10 +344,8 @@ def get_cache_health(path):
         "size": size
     }
 
-def get_system_info():
     mem = psutil.virtual_memory()
     cpu_percent = psutil.cpu_percent(interval=None)
-
     uptime = datetime.datetime.now() - datetime.datetime.fromtimestamp(psutil.boot_time())
 
     return {
@@ -328,7 +355,8 @@ def get_system_info():
         "memory_percent": mem.percent,
         "memory_used": mem.used,
         "memory_total": mem.total,
-        "uptime": str(uptime)
+        "uptime": str(uptime),
+        "cpu_count": psutil.cpu_count(),
     }
 
 # -----------------------------
@@ -344,6 +372,101 @@ async def notify_progress(batch_id: str):
             dead.append(ws)
     for ws in dead:
         WS_CONNECTIONS[batch_id].discard(ws)
+
+# -----------------------------
+# Model recommendation
+# -----------------------------
+def estimate_recommended_model(cpu_count: int, tokens_per_second: float, has_gpu: bool):
+    # Very simple heuristic
+    if has_gpu:
+        if tokens_per_second > 50:
+            return "large-v3"
+        elif tokens_per_second > 30:
+            return "medium"
+        else:
+            return "small"
+    else:
+        if tokens_per_second > 30:
+            return "medium"
+        elif tokens_per_second > 20:
+            return "small"
+        elif tokens_per_second > 10:
+            return "base"
+        else:
+            return "tiny"
+
+# -----------------------------
+# Timeout config
+# -----------------------------
+async def set_timeout(cfg: TimeoutConfig):
+    CONFIG["whisper_timeout"] = max(60, min(cfg.timeout, 7200))
+    return {"status": "ok", "timeout": CONFIG["whisper_timeout"]}
+
+
+# -----------------------------
+# Model config endpoint
+# -----------------------------
+@app.post("/api/set_model_config")
+async def set_model_config(cfg: ModelConfig):
+    CONFIG["auto_model_enabled"] = cfg.auto_enabled
+    CONFIG["whisper_model_override"] = cfg.override_model
+    return {"status": "ok", "config": CONFIG}
+
+# -----------------------------
+# Speedtest endpoint
+# -----------------------------
+@app.post("/api/model_speedtest")
+async def model_speedtest():
+    # synthetic 5s sine wave @ 16kHz mono
+    sr = 16000
+    duration = 5
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    audio = 0.1 * np.sin(2 * np.pi * 440 * t)
+    audio_bytes = audio.astype("float32").tobytes()
+
+    url = os.getenv("FASTER_WHISPER_URL", "http://faster-whisper:10300/inference")
+
+    start = time.time()
+    with httpx.Client(timeout=CONFIG["whisper_timeout"]) as client:
+        resp = client.post(
+            url,
+            files={"audio_file": ("test.raw", audio_bytes, "application/octet-stream")},
+            data={"task": "transcribe", "language": "en"},
+        )
+    elapsed = time.time() - start
+
+    # crude tokens/sec estimate: assume ~4 tokens/sec of audio
+    tokens = duration * 4
+    tps = tokens / elapsed if elapsed > 0 else 0.0
+
+    sysinfo = get_system_info()
+    has_gpu = False  # extend later if you want GPU detection
+
+    recommended = estimate_recommended_model(sysinfo["cpu_count"], tps, has_gpu)
+
+    return {
+        "model": CONFIG["whisper_model"],
+        "processing_seconds": elapsed,
+        "tokens_per_second": tps,
+        "estimated_minutes_per_minute": (elapsed / 60) / (duration / 60),
+        "hardware": "CPU",
+        "dtype": "float32",
+        "recommended_model": recommended,
+    }
+
+# -----------------------------
+# Chunked queue endpoint
+# -----------------------------
+@app.post("/api/transcribe_chunked")
+async def transcribe_chunked(job: ChunkJob):
+    # Here you’d:
+    # 1. Locate file by file_id
+    # 2. Split into chunks (e.g. via ffmpeg or pydub)
+    # 3. Enqueue each chunk into CHUNK_QUEUE
+    # 4. Process sequentially or via worker
+    # 5. Merge results
+    # For now, just return a placeholder
+    return {"status": "not_implemented_yet"}
 
 # -----------------------------
 # WebSocket endpoints
@@ -484,10 +607,7 @@ async def ui_system(request: Request):
 # -----------------------------
 @app.get("/api/system_stats")
 async def system_stats():
-    global NET_LAST
-    global DISK_LAST
-    global CPU_HISTORY
-    global RAM_HISTORY
+    global NET_LAST, DISK_LAST, CPU_HISTORY, RAM_HISTORY
 
     # CPU
     cpu = psutil.cpu_percent(interval=None)
@@ -519,15 +639,10 @@ async def system_stats():
         "system": get_system_info(),
         "cpu_history": list(CPU_HISTORY),
         "ram_history": list(RAM_HISTORY),
-        "disk_io": {
-            "read": disk_read,
-            "write": disk_write
-        },
-        "network": {
-            "recv": net_recv,
-            "sent": net_sent
-        },
-        "temps": temps
+        "disk_io": {"read": disk_read, "write": disk_write},
+        "network": {"recv": net_recv, "sent": net_sent},
+        "temps": temps,
+        "config": CONFIG,
     }
 
 # -----------------------------
