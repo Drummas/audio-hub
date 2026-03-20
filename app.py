@@ -148,6 +148,22 @@ class ChunkJob(BaseModel):
     language: str
     task: str  # "transcribe" or "translate"
 
+def get_system_info():
+    mem = psutil.virtual_memory()
+    cpu_percent = psutil.cpu_percent(interval=None)
+    uptime = datetime.datetime.now() - datetime.datetime.fromtimestamp(psutil.boot_time())
+
+    return {
+        "platform": platform.platform(),
+        "python": platform.python_version(),
+        "cpu_percent": cpu_percent,
+        "memory_percent": mem.percent,
+        "memory_used": mem.used,
+        "memory_total": mem.total,
+        "uptime": str(uptime),  # must be string for JSON
+        "cpu_count": psutil.cpu_count(),
+    }
+
 # -----------------------------
 # WebSocket + SSE helpers
 # -----------------------------
