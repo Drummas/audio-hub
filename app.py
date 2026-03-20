@@ -949,7 +949,7 @@ async def get_batch(batch_id: str):
 # =============================
 @app.get("/", response_class=HTMLResponse)
 async def ui_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("home.html", {"request": request})
 
 @app.get("/ui/files", response_class=HTMLResponse)
 async def ui_files(request: Request):
