@@ -1195,17 +1195,19 @@ async def ui_settings_post(
     whisper_model: str = Form(...),
     xtts_language: str = Form(...),
     xtts_voice: str = Form(...),
-):   
+):
     cfg = load_config()
 
-    # Override with environment variables if present
-    cfg["whisper_model"] = os.getenv("WHISPER_MODEL", cfg["whisper_model"])
-    cfg["xtts_language"] = os.getenv("XTTS_LANGUAGE", cfg["xtts_language"])
-    cfg["xtts_voice"] = os.getenv("XTTS_VOICE", cfg["xtts_voice"])       
-    
+    # Use the values submitted by the user
+    cfg["whisper_model"] = whisper_model
+    cfg["xtts_language"] = xtts_language
+    cfg["xtts_voice"] = xtts_voice
+
     save_config(cfg)
+
     return templates.TemplateResponse(
-        "settings.html", {"request": request, "cfg": cfg}
+        "settings.html",
+        {"request": request, "cfg": cfg, "message": "Settings saved!"}
     )
 
 @app.get("/ui/error", response_class=HTMLResponse)
