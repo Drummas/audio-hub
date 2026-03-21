@@ -443,17 +443,20 @@ async def model_speedtest():
         )
     elapsed = time.time() - start
 
-    # crude tokens/sec estimate: assume ~4 tokens/sec of audio
     tokens = duration * 4
     tps = tokens / elapsed if elapsed > 0 else 0.0
 
     sysinfo = get_system_info()
-    has_gpu = False  # extend later if you want GPU detection
+    has_gpu = False  # extend later if needed
 
     recommended = estimate_recommended_model(sysinfo["cpu_count"], tps, has_gpu)
 
+    # optionally auto-apply if enabled
+    if CONFIG["auto_model_enabled"] and not CONFIG["whisper_model_override"]:
+        CONFIG["whisper_model"] = recommended
+
     return {
-        "model": CONFIG["whisper_model"],
+        "model": get_effective_whisper_model(),
         "processing_seconds": elapsed,
         "tokens_per_second": tps,
         "estimated_minutes_per_minute": (elapsed / 60) / (duration / 60),
