@@ -7,25 +7,29 @@
 <fieldset>
   <legend>Speed Test</legend>
 
+  <button id="speedtest-btn" style="margin-bottom:1rem;">Run Model Speed Test</button>
+
   <p id="speedtest-result" style="margin-top:0.5rem; color:var(--accent);"></p>
 
   <label>Recommended Model:</label>
-  <div id="recommended-model" style="margin-bottom:1rem;">
+  <div id="recommended-model">
     Run speed test to calculate
   </div>
 </fieldset>
-
-<button id="speedtest-btn">Run Model Speed Test</button>
 
 <fieldset>
   <legend>Whisper Configuration</legend>
 
   <label>Timeout (seconds):</label>
   <input type="number" id="timeout-input" min="60" max="7200" step="30">
+
+  <button id="timeout-save">Save Timeout</button>
   <p id="timeout-status" style="margin-top:0.5rem; color:var(--accent);"></p>
 
-  <label style="margin-top:1rem;">
-    <input type="checkbox" id="auto-model"> Enable Auto Model Selection
+  <!-- Checkbox on its own line -->
+  <label style="display:flex; align-items:center; gap:0.5rem; margin-top:1rem;">
+    <input type="checkbox" id="auto-model">
+    Enable Auto Model Selection
   </label>
 
   <label>Override Model:</label>
@@ -38,70 +42,69 @@
     <option value="large-v3">large-v3</option>
   </select>
 
+  <button id="model-save">Save Model Config</button>
   <p id="model-status" style="margin-top:0.5rem; color:var(--accent);"></p>
 </fieldset>
 
-<button id="timeout-save">Save Timeout</button>  <button id="model-save">Save Model Config</button>
-
 <script>
-	// -----------------------------
-	// Speed test
-	// -----------------------------
-	document.getElementById("speedtest-btn").onclick = async () => {
-	  const el = document.getElementById("speedtest-result");
-	  el.textContent = "Running speed test…";
+  // -----------------------------
+  // Speed test
+  // -----------------------------
+  document.getElementById("speedtest-btn").onclick = async () => {
+    const el = document.getElementById("speedtest-result");
+    el.textContent = "Running speed test…";
 
-	  const resp = await fetch("/api/model_speedtest", { method: "POST" });
-	  const data = await resp.json();
+    const resp = await fetch("/api/model_speedtest", { method: "POST" });
+    const data = await resp.json();
 
-	  el.textContent = `Model: ${data.model}, ${data.processing_seconds.toFixed(2)}s`;
-	  document.getElementById("recommended-model").textContent = data.recommended_model;
-	};
+    el.textContent = `Model: ${data.model}, ${data.processing_seconds.toFixed(2)}s`;
+    document.getElementById("recommended-model").textContent = data.recommended_model;
+  };
 
-	// -----------------------------
-	// Timeout save
-	// -----------------------------
-	document.getElementById("timeout-save").onclick = async () => {
-	  const val = parseInt(document.getElementById("timeout-input").value, 10);
+  // -----------------------------
+  // Timeout save
+  // -----------------------------
+  document.getElementById("timeout-save").onclick = async () => {
+    const val = parseInt(document.getElementById("timeout-input").value, 10);
 
-	  await fetch("/api/set_timeout", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ timeout: val })
-	  });
+    await fetch("/api/set_timeout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timeout: val })
+    });
 
-	  document.getElementById("timeout-status").textContent = "Saved";
-	};
+    document.getElementById("timeout-status").textContent = "Saved";
+  };
 
-	// -----------------------------
-	// Model config save
-	// -----------------------------
-	document.getElementById("model-save").onclick = async () => {
-	  const autoEnabled = document.getElementById("auto-model").checked;
-	  const override = document.getElementById("override-model").value || null;
+  // -----------------------------
+  // Model config save
+  // -----------------------------
+  document.getElementById("model-save").onclick = async () => {
+    const autoEnabled = document.getElementById("auto-model").checked;
+    const override = document.getElementById("override-model").value || null;
 
-	  await fetch("/api/set_model_config", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ auto_enabled: autoEnabled, override_model: override })
-	  });
+    await fetch("/api/set_model_config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ auto_enabled: autoEnabled, override_model: override })
+    });
 
-	  document.getElementById("model-status").textContent = "Saved";
-	};
+    document.getElementById("model-status").textContent = "Saved";
+  };
 
-	// -----------------------------
-	// Load config on page load
-	// -----------------------------
-	async function loadConfig() {
-	  const resp = await fetch("/api/system_stats");
-	  const data = await resp.json();
+  // -----------------------------
+  // Load config on page load
+  // -----------------------------
+  async function loadConfig() {
+    const resp = await fetch("/api/system_stats");
+    const data = await resp.json();
 
-	  document.getElementById("timeout-input").value = data.config.whisper_timeout;
-	  document.getElementById("auto-model").checked = data.config.auto_model_enabled;
-	  document.getElementById("override-model").value = data.config.whisper_model_override || "";
-	}
+    document.getElementById("timeout-input").value = data.config.whisper_timeout;
+    document.getElementById("auto-model").checked = data.config.auto_model_enabled;
+    document.getElementById("override-model").value = data.config.whisper_model_override || "";
+  }
 
-	loadConfig();
+  loadConfig();
 </script>
 
 {% endblock %}

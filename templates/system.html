@@ -61,9 +61,23 @@
 
 <fieldset>
   <legend>Advanced Metrics</legend>
-  <button id="adv-toggle" type="button">Show Advanced</button>
-  <pre id="raw-json" style="display:none; margin-top:1rem;"></pre>
+  <pre id="raw-json" style="
+    display:none;
+    background:var(--bg-alt);
+    border:1px solid var(--border);
+    padding:1rem;
+    border-radius:8px;
+    max-height:400px;
+    overflow:auto;
+    white-space:pre-wrap;
+    font-size:0.9rem;
+    line-height:1.4;
+  "></pre>
 </fieldset>
+
+<button id="adv-toggle" type="button" style="margin-bottom:1rem;">
+	Show Advanced
+</button>
 
 <script>
 	function updateHealth(cpu, ram, disk) {
