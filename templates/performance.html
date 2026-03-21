@@ -145,7 +145,7 @@
 	};
 
 	// -----------------------------
-	// Refresh config every 2 seconds
+	// Load config once on page load
 	// -----------------------------
 	async function refreshStats() {
 	  const resp = await fetch("/api/system_stats");
@@ -156,7 +156,6 @@
 	  document.getElementById("override-model").value = data.config.whisper_model_override || "";
 	}
 
-	setInterval(refreshStats, 2000);
 	refreshStats();
 </script>
 
