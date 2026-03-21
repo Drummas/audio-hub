@@ -61,7 +61,7 @@ FASTER_WHISPER_URL = os.getenv(
     "http://faster-whisper:10300/inference"
 )
 
-DEFAULT_CONFIG = {
+CONFIG = {
     "whisper_model": os.getenv("WHISPER_MODEL", "large-v3"),
     "whisper_timeout": os.getenv("WHISPER_TIMEOUT", 600),
     "whisper_model_override": os.getenv("WHISPER_MODEL_OVERRIDE", None),
@@ -84,10 +84,10 @@ templates = Jinja2Templates(directory="templates")
 # =============================
 def load_config():
     if not os.path.exists(CONFIG_PATH):
-        return DEFAULT_CONFIG.copy()
+        return CONFIG.copy()
     with open(CONFIG_PATH) as f:
         data = json.load(f)
-    return {**DEFAULT_CONFIG, **data}
+    return {**CONFIG, **data}
 
 def save_config(cfg):
     with open(CONFIG_PATH, "w") as f:
@@ -1236,7 +1236,7 @@ async def ui_dashboard(request: Request):
 logger.info(json.dumps({
     "event": "config",
     "FASTER_WHISPER_URL": FASTER_WHISPER_URL,
-    "whisper_model": DEFAULT_CONFIG["whisper_model"],
-    "xtts_language": DEFAULT_CONFIG["xtts_language"],
-    "xtts_voice": DEFAULT_CONFIG["xtts_voice"],
+    "whisper_model": CONFIG["whisper_model"],
+    "xtts_language": CONFIG["xtts_language"],
+    "xtts_voice": CONFIG["xtts_voice"],
 }, ensure_ascii=False))
