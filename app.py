@@ -454,6 +454,7 @@ async def model_speedtest():
     # optionally auto-apply if enabled
     if CONFIG["auto_model_enabled"] and not CONFIG["whisper_model_override"]:
         CONFIG["whisper_model"] = recommended
+        save_config(CONFIG)
 
     return {
         "model": get_effective_whisper_model(),
@@ -663,7 +664,7 @@ async def system_stats():
         "disk_io": {"read": disk_read, "write": disk_write},
         "network": {"recv": net_recv, "sent": net_sent},
         "temps": temps,
-        "config": CONFIG,
+        "config": load_config(),
     }
 
 # =============================
