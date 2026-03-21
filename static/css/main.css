@@ -81,7 +81,7 @@ input, select, textarea {
 }
 
 button {
-  background: var(--button-bg);
+  background: #0a84ff;
   color: #fff;
   padding: 0.7rem 1.2rem;
   border: none;

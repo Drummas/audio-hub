@@ -24,40 +24,40 @@
 "></pre>
 
 <script>
-let paused = false;
-let timer = null;
+	let paused = false;
+	let timer = null;
 
-const logsBox = document.getElementById("logs-box");
-const pauseBtn = document.getElementById("pause-btn");
-const resumeBtn = document.getElementById("resume-btn");
-const linesInput = document.getElementById("lines-input");
+	const logsBox = document.getElementById("logs-box");
+	const pauseBtn = document.getElementById("pause-btn");
+	const resumeBtn = document.getElementById("resume-btn");
+	const linesInput = document.getElementById("lines-input");
 
-pauseBtn.onclick = () => {
-  paused = true;
-  pauseBtn.disabled = true;
-  resumeBtn.disabled = false;
-};
+	pauseBtn.onclick = () => {
+	  paused = true;
+	  pauseBtn.disabled = true;
+	  resumeBtn.disabled = false;
+	};
 
-resumeBtn.onclick = () => {
-  paused = false;
-  pauseBtn.disabled = false;
-  resumeBtn.disabled = true;
-  fetchLogs();
-};
+	resumeBtn.onclick = () => {
+	  paused = false;
+	  pauseBtn.disabled = false;
+	  resumeBtn.disabled = true;
+	  fetchLogs();
+	};
 
-function fetchLogs() {
-  if (paused) return;
-  const lines = linesInput.value || 200;
-  fetch(`/logs?lines=${lines}`)
-    .then(r => r.json())
-    .then(data => {
-      logsBox.textContent = data.logs.join("\n");
-      logsBox.scrollTop = logsBox.scrollHeight;
-    })
-    .catch(console.error);
-}
+	function fetchLogs() {
+	  if (paused) return;
+	  const lines = linesInput.value || 200;
+	  fetch(`/logs?lines=${lines}`)
+		.then(r => r.json())
+		.then(data => {
+		  logsBox.textContent = data.logs.join("\n");
+		  logsBox.scrollTop = logsBox.scrollHeight;
+		})
+		.catch(console.error);
+	}
 
-timer = setInterval(fetchLogs, 2000);
-fetchLogs();
+	timer = setInterval(fetchLogs, 2000);
+	fetchLogs();
 </script>
 {% endblock %}
