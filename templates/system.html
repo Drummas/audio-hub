@@ -61,18 +61,46 @@
 
 <fieldset>
   <legend>Advanced Metrics</legend>
-  <pre id="raw-json" style="
-    display:none;
-    background:var(--bg-alt);
-    border:1px solid var(--border);
-    padding:1rem;
-    border-radius:8px;
-    max-height:400px;
-    overflow:auto;
-    white-space:pre-wrap;
-    font-size:0.9rem;
-    line-height:1.4;
-  "></pre>
+
+  <button id="adv-toggle" type="button" style="margin-bottom:1rem;">
+    Show Advanced
+  </button>
+
+  <div id="adv-panel" style="display:none;">
+
+    <div style="margin-bottom:1rem;">
+      <h3 style="margin:0 0 0.5rem;">System Info</h3>
+      <p><strong>Platform:</strong> <span id="adv-platform"></span></p>
+      <p><strong>Python:</strong> <span id="adv-python"></span></p>
+      <p><strong>Uptime:</strong> <span id="adv-uptime"></span></p>
+      <p><strong>CPU Count:</strong> <span id="adv-cpu-count"></span></p>
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <h3 style="margin:0 0 0.5rem;">Memory Details</h3>
+      <p><strong>Used:</strong> <span id="adv-mem-used"></span></p>
+      <p><strong>Total:</strong> <span id="adv-mem-total"></span></p>
+      <p><strong>Percent:</strong> <span id="adv-mem-percent"></span>%</p>
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <h3 style="margin:0 0 0.5rem;">CPU History</h3>
+      <p id="adv-cpu-history" style="opacity:0.8; font-size:0.9rem;"></p>
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <h3 style="margin:0 0 0.5rem;">Disk Details</h3>
+      <p><strong>Paths:</strong></p>
+      <ul id="adv-disk-list" style="margin-top:0.5rem;"></ul>
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <h3 style="margin:0 0 0.5rem;">Network Details</h3>
+      <p><strong>Download:</strong> <span id="adv-net-recv"></span> B/s</p>
+      <p><strong>Upload:</strong> <span id="adv-net-sent"></span> B/s</p>
+    </div>
+
+  </div>
 </fieldset>
 
 <button id="adv-toggle" type="button" style="margin-bottom:1rem;">

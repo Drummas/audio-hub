@@ -23,13 +23,11 @@
   <label>Timeout (seconds):</label>
   <input type="number" id="timeout-input" min="60" max="7200" step="30">
 
-  <button id="timeout-save">Save Timeout</button>
   <p id="timeout-status" style="margin-top:0.5rem; color:var(--accent);"></p>
 
   <!-- Checkbox on its own line -->
-  <label style="display:flex; align-items:center; gap:0.5rem; margin-top:1rem;">
-    <input type="checkbox" id="auto-model">
-    Enable Auto Model Selection
+  <label style="display:flex; align-items:left; gap:0.5rem; margin-top:1rem;">
+    <input type="checkbox" id="auto-model">Enable Auto Model Selection
   </label>
 
   <label>Override Model:</label>
@@ -42,9 +40,10 @@
     <option value="large-v3">large-v3</option>
   </select>
 
-  <button id="model-save">Save Model Config</button>
   <p id="model-status" style="margin-top:0.5rem; color:var(--accent);"></p>
 </fieldset>
+
+<button id="timeout-save">Save Timeout</button><button id="model-save">Save Model Config</button>
 
 <script>
   // -----------------------------
