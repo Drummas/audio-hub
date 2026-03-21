@@ -48,3 +48,4 @@ services:
 
 networks:
   audio-net:
+    driver: bridge
