@@ -179,8 +179,38 @@
 	  const diskPercent = data.disk && data.disk.length ? data.disk[0].percent : 0;
 	  updateHealth(cpu, ram, diskPercent);
 
-	  // Advanced
-	  document.getElementById("raw-json").textContent = JSON.stringify(data, null, 2);
+	 // -----------------------------
+	 // Advanced Metrics (formatted blocks)
+	 // -----------------------------
+
+	 // System Info
+	 document.getElementById("adv-platform").textContent = data.system.platform;
+	 document.getElementById("adv-python").textContent = data.system.python;
+	 document.getElementById("adv-uptime").textContent = data.system.uptime;
+	 document.getElementById("adv-cpu-count").textContent = data.system.cpu_count;
+
+	 // Memory Details
+	 document.getElementById("adv-mem-used").textContent = data.system.memory_used;
+	 document.getElementById("adv-mem-total").textContent = data.system.memory_total;
+	 document.getElementById("adv-mem-percent").textContent = data.system.memory_percent;
+
+	 // CPU History (last 20 entries)
+	 document.getElementById("adv-cpu-history").textContent =
+	 data.cpu_history.slice(-20).join(", ");
+
+	 // Disk Details
+	 const diskList = document.getElementById("adv-disk-list");
+	 diskList.innerHTML = "";
+	 data.disk.forEach(d => {
+	   const li = document.createElement("li");
+	   li.textContent = `${d.path}: ${d.percent}% used`;
+	   diskList.appendChild(li);
+	 });
+
+	 // Network Details
+	 document.getElementById("adv-net-recv").textContent = data.network.recv;
+	 document.getElementById("adv-net-sent").textContent = data.network.sent;
+
 	}
 
 	// Advanced toggle
