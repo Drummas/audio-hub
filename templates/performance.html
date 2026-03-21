@@ -4,137 +4,92 @@
 
 <h1>Model Performance</h1>
 
-<style>
-  .perf-card {
-    background:#111;
-    border:1px solid #333;
-    padding:20px;
-    border-radius:8px;
-    max-width:600px;
-  }
+<fieldset>
+  <legend>Speed Test</legend>
 
-  .row {
-    margin-bottom:15px;
-    display:flex;
-    flex-direction:column;
-  }
+  <button id="speedtest-btn">Run Model Speed Test</button>
+  <p id="speedtest-result" style="margin-top:0.5rem; color:var(--accent);"></p>
 
-  label {
-    font-size:14px;
-    margin-bottom:6px;
-  }
-
-  input, select {
-    background:#222;
-    border:1px solid #444;
-    padding:6px 8px;
-    border-radius:4px;
-    color:#fff;
-  }
-
-  button {
-    background:#0a84ff;
-    border:none;
-    padding:8px 14px;
-    border-radius:4px;
-    cursor:pointer;
-    color:#fff;
-    font-weight:bold;
-  }
-
-  button:hover {
-    background:#006edc;
-  }
-
-  .status {
-    margin-left:10px;
-    font-size:13px;
-    color:#0f0;
-  }
-
-  .inline {
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-</style>
-
-<div class="perf-card">
-
-  <div class="row">
-    <button id="speedtest-btn">Run Model Speed Test</button>
-    <span id="speedtest-result" class="status"></span>
+  <label>Recommended Model:</label>
+  <div id="recommended-model" style="margin-bottom:1rem;">
+    Run speed test to calculate
   </div>
+</fieldset>
 
-  <div class="row">
-    <label>Recommended Model:</label>
-    <span id="recommended-model">Run speed test to calculate</span>
-  </div>
+<fieldset>
+  <legend>Whisper Configuration</legend>
 
-  <div class="row inline">
-    <label>Timeout (seconds):</label>
-    <input type="number" id="timeout-input" min="60" max="7200" step="30">
-    <button id="timeout-save">Save</button>
-    <span id="timeout-status" class="status"></span>
-  </div>
+  <label>Timeout (seconds):</label>
+  <input type="number" id="timeout-input" min="60" max="7200" step="30">
+  <button id="timeout-save">Save Timeout</button>
+  <p id="timeout-status" style="margin-top:0.5rem; color:var(--accent);"></p>
 
-  <div class="row">
-    <label><input type="checkbox" id="auto-model"> Enable Auto Model Selection</label>
-  </div>
+  <label style="margin-top:1rem;">
+    <input type="checkbox" id="auto-model"> Enable Auto Model Selection
+  </label>
 
-  <div class="row inline">
-    <label>Override Model:</label>
-    <select id="override-model">
-      <option value="">None</option>
-      <option value="tiny">tiny</option>
-      <option value="base">base</option>
-      <option value="small">small</option>
-      <option value="medium">medium</option>
-      <option value="large-v3">large-v3</option>
-    </select>
-    <button id="model-save">Save</button>
-    <span id="model-status" class="status"></span>
-  </div>
+  <label>Override Model:</label>
+  <select id="override-model">
+    <option value="">None</option>
+    <option value="tiny">tiny</option>
+    <option value="base">base</option>
+    <option value="small">small</option>
+    <option value="medium">medium</option>
+    <option value="large-v3">large-v3</option>
+  </select>
 
-</div>
+  <button id="model-save">Save Model Config</button>
+  <p id="model-status" style="margin-top:0.5rem; color:var(--accent);"></p>
+</fieldset>
 
 <script>
 	// -----------------------------
-	// Button handlers (run once)
+	// Speed test
 	// -----------------------------
 	document.getElementById("speedtest-btn").onclick = async () => {
 	  const el = document.getElementById("speedtest-result");
 	  el.textContent = "Running speed test…";
+
 	  const resp = await fetch("/api/model_speedtest", { method: "POST" });
 	  const data = await resp.json();
+
 	  el.textContent = `Model: ${data.model}, ${data.processing_seconds.toFixed(2)}s`;
 	  document.getElementById("recommended-model").textContent = data.recommended_model;
 	};
 
+	// -----------------------------
+	// Timeout save
+	// -----------------------------
 	document.getElementById("timeout-save").onclick = async () => {
 	  const val = parseInt(document.getElementById("timeout-input").value, 10);
-	  const resp = await fetch("/api/set_timeout", {
+
+	  await fetch("/api/set_timeout", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ timeout: val })
 	  });
-	  const data = await resp.json();
-	  document.getElementById("timeout-status").textContent = `Saved`;
+
+	  document.getElementById("timeout-status").textContent = "Saved";
 	};
 
+	// -----------------------------
+	// Model config save
+	// -----------------------------
 	document.getElementById("model-save").onclick = async () => {
 	  const autoEnabled = document.getElementById("auto-model").checked;
 	  const override = document.getElementById("override-model").value || null;
-	  const resp = await fetch("/api/set_model_config", {
+
+	  await fetch("/api/set_model_config", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ auto_enabled: autoEnabled, override_model: override })
 	  });
+
 	  document.getElementById("model-status").textContent = "Saved";
 	};
 
 	// -----------------------------
-	// Load config once on page load
+	// Load config on page load
 	// -----------------------------
 	async function loadConfig() {
 	  const resp = await fetch("/api/system_stats");
