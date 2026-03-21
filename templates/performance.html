@@ -7,8 +7,6 @@
 <fieldset>
   <legend>Speed Test</legend>
 
-  <button id="speedtest-btn" style="margin-bottom:1rem;">Run Model Speed Test</button>
-
   <p id="speedtest-result" style="margin-top:0.5rem; color:var(--accent);"></p>
 
   <label>Recommended Model:</label>
@@ -16,6 +14,8 @@
     Run speed test to calculate
   </div>
 </fieldset>
+
+  <button id="speedtest-btn" style="margin-bottom:1rem;">Run Model Speed Test</button>
 
 <fieldset>
   <legend>Whisper Configuration</legend>
@@ -26,7 +26,7 @@
   <p id="timeout-status" style="margin-top:0.5rem; color:var(--accent);"></p>
 
   <!-- Checkbox on its own line -->
-  <label style="display:flex; align-items:left; gap:0.5rem; margin-top:1rem;">
+  <label>
     <input type="checkbox" id="auto-model">Enable Auto Model Selection
   </label>
 
